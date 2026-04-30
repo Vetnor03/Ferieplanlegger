@@ -73,13 +73,15 @@
       background: white;
       cursor: pointer;
       min-height: 44px;
-      font-size: 0.8rem;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #1f2937;
     }
     .calendar-day.empty { visibility: hidden; cursor: default; }
-    .calendar-day.weekend { background: #f3f4f6; }
-    .calendar-day.holiday { background: #ede9fe; }
-    .calendar-day.special { background: #fee2e2; }
-    .calendar-day.selected { outline: 2px solid #16a34a; background: var(--selected); }
+    .calendar-day.weekend { background: #f3f4f6; color: #4b5563; }
+    .calendar-day.holiday { background: #ede9fe; color: #4338ca; }
+    .calendar-day.special { background: #fee2e2; color: #991b1b; }
+    .calendar-day.selected { outline: 2px solid #16a34a; background: var(--selected); color: #065f46; }
     .calendar-day small { display:block; color: var(--muted); font-size:0.7rem; }
     .weekday-head { text-align:center; color: var(--muted); font-size:0.75rem; margin-bottom:4px; }
     .calendar-actions { display:flex; gap:8px; flex-wrap: wrap; }
@@ -210,8 +212,27 @@ preferred.periods.forEach(p=>{if(!overlaps(p,usedDates)&&used+p.used<=available)
 let left=available-used;
 const candidates=[]; const start=new Date(year,0,1),end=new Date(year,11,31);
 for(let s=new Date(start);s<=end;s=addDays(s,1)){if(!inFilter(s,year)) continue; for(let len=4;len<=18;len++){const e=addDays(s,len-1); if(!inFilter(e,year)) continue; const p=evaluatePeriod(s,e,map,'Smart broperiode'); if(p.used>0&&p.used<=left&&p.gained>=2) candidates.push(p);}}
-candidates.sort((a,b)=>b.score-a.score||b.gained-a.gained||a.used-b.used);
-for(const c of candidates){if(c.used>left||overlaps(c,usedDates)) continue; picked.push(c); c.days.forEach(d=>usedDates.add(dateKey(d.date))); left-=c.used; if(left===0) break;}
+const monthWeight = (m) => (m >= 6 ? 0.2 : 0);
+const avgMonth = (periods) => periods.length ? periods.reduce((sum,p)=>sum+((p.start.getMonth()+p.end.getMonth())/2),0)/periods.length : 5.5;
+for(;;){
+  let best=null;
+  const currentAvg=avgMonth(picked);
+  for(const c of candidates){
+    if(c.used>left||overlaps(c,usedDates)) continue;
+    const cMid=(c.start.getMonth()+c.end.getMonth())/2;
+    const spreadBoost=Math.max(0,cMid-currentAvg)*0.03;
+    const balancedScore=c.score+monthWeight(cMid)+spreadBoost+(c.gained*0.01)-(c.used*0.005);
+    if(!best||balancedScore>best.balancedScore||(balancedScore===best.balancedScore&&cMid>best.cMid)){
+      best={period:c,balancedScore,cMid};
+    }
+  }
+  if(!best) break;
+  const c=best.period;
+  picked.push(c);
+  c.days.forEach(d=>usedDates.add(dateKey(d.date)));
+  left-=c.used;
+  if(left===0) break;
+}
 if(left>0){const fillers=[]; for(let s=new Date(start);s<=end;s=addDays(s,1)){if(!inFilter(s,year)) continue; for(let len=left;len<=Math.min(24,left+10);len++){const e=addDays(s,len-1); if(!inFilter(e,year)) continue; const p=evaluatePeriod(s,e,map,'Utfylling for å bruke restdager'); if(p.used===left&&!overlaps(p,usedDates)) fillers.push(p);}}
 fillers.sort((a,b)=>b.total-a.total||b.gained-a.gained); if(fillers[0]){const f=fillers[0]; picked.push(f); f.days.forEach(d=>usedDates.add(dateKey(d.date))); left=0;}}
 if(left>0){for(let d=new Date(year,5,15);d<=end&&left>0;d=addDays(d,1)){if(!inFilter(d,year)) continue; const p=evaluatePeriod(d,d,map,'Enkelt-dag for å bruke alle feriedager'); if(p.used===1&&!overlaps(p,usedDates)){picked.push(p); usedDates.add(dateKey(d)); left--;}}}
@@ -270,7 +291,7 @@ function renderCalendar(){
     if(isWeekend(d)) cls.push('weekend');
     if(holiday) cls.push(holiday.includes('spesialdag') ? 'special' : 'holiday');
     if(selectedDates.has(key)) cls.push('selected');
-    html += `<button type="button" class="${cls.join(' ')}" onclick="toggleDate('${key}')">${day}${holiday?`<small>${holiday.split(' ')[0]}</small>`:''}</button>`;
+    html += `<button type="button" class="${cls.join(' ')}" onclick="toggleDate('${key}')">${day}</button>`;
   }
   html += '</div>';
   root.innerHTML=html;
