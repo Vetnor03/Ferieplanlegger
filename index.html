@@ -128,6 +128,16 @@
           <option value="custom">Egendefinert datoperiode</option>
         </select>
       </div>
+      <div>
+        <label for="minContinuousWeeks">Minimum sammenhengende ferieperiode</label>
+        <select id="minContinuousWeeks">
+          <option value="0">Ingen krav</option>
+          <option value="1">Minst 1 uke</option>
+          <option value="2">Minst 2 uker</option>
+          <option value="3">Minst 3 uker</option>
+          <option value="4">Minst 4 uker</option>
+        </select>
+      </div>
 
       <div class="form-cols" id="customRange" style="display:none;">
         <div><label for="customStart">Fra dato</label><input id="customStart" type="date" /></div>
@@ -172,13 +182,24 @@ const dayNames=["søn","man","tir","ons","tor","fre","lør"]; const monthNames=[
 const yearSel=document.getElementById('year'); const nowY=new Date().getFullYear(); for(let y=nowY;y<=nowY+3;y++){yearSel.add(new Option(String(y),String(y)));}
 let pickerMonth = new Date().getMonth();
 const season=document.getElementById('season'); season.addEventListener('change',()=>document.getElementById('customRange').style.display=season.value==='custom'?'grid':'none');
+const today = new Date();
+today.setHours(0,0,0,0);
 const dateKey=d=>d.toISOString().slice(0,10); const addDays=(d,n)=>{const x=new Date(d); x.setDate(x.getDate()+n); return x;}; const isWeekend=d=>d.getDay()===0||d.getDay()===6;
 const selectedDates = new Set();
 
 function easterSunday(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return new Date(y,mo-1,da);}
 function holidaysNO(year, includeSpecial){const e=easterSunday(year);const holidays=[{date:new Date(year,0,1),name:'Nyttårsdag'},{date:addDays(e,-3),name:'Skjærtorsdag'},{date:addDays(e,-2),name:'Langfredag'},{date:addDays(e,0),name:'1. påskedag'},{date:addDays(e,1),name:'2. påskedag'},{date:new Date(year,4,1),name:'Arbeidernes dag'},{date:new Date(year,4,17),name:'Grunnlovsdag (17. mai)'},{date:addDays(e,39),name:'Kristi himmelfartsdag'},{date:addDays(e,49),name:'1. pinsedag'},{date:addDays(e,50),name:'2. pinsedag'},{date:new Date(year,11,25),name:'1. juledag'},{date:new Date(year,11,26),name:'2. juledag'}];
 if(includeSpecial){holidays.push({date:new Date(year,11,24),name:'Julaften (spesialdag)'},{date:new Date(year,11,31),name:'Nyttårsaften (spesialdag)'});} const map={};holidays.forEach(h=>map[dateKey(h.date)]=h.name); return {holidays,map};}
-function inFilter(d, year){const s=season.value; if(s==='all') return d.getFullYear()===year; if(s==='spring') return d>=new Date(year,2,1)&&d<=new Date(year,4,31); if(s==='summer') return d>=new Date(year,5,1)&&d<=new Date(year,7,31); if(s==='autumn') return d>=new Date(year,8,1)&&d<=new Date(year,10,30); if(s==='xmas') return d>=new Date(year,11,15)&&d<=new Date(year+1,0,10); if(s==='custom'){const a=new Date(document.getElementById('customStart').value); const b=new Date(document.getElementById('customEnd').value); if(isNaN(a)||isNaN(b)) return false; return d>=a&&d<=b;} return true;}
+function inFilter(d, year){
+const s=season.value;
+if(d<today) return false;
+if(s==='all') return d.getFullYear()===year;
+if(s==='spring') return d>=new Date(year,2,1)&&d<=new Date(year,4,31);
+if(s==='summer') return d>=new Date(year,5,1)&&d<=new Date(year,7,31);
+if(s==='autumn') return d>=new Date(year,8,1)&&d<=new Date(year,10,30);
+if(s==='xmas') return d>=new Date(year,11,15)&&d<=new Date(year+1,0,10);
+if(s==='custom'){const a=new Date(document.getElementById('customStart').value); const b=new Date(document.getElementById('customEnd').value); if(isNaN(a)||isNaN(b)) return false; return d>=a&&d<=b;}
+return true;}
 function evaluatePeriod(start,end,map,reason){let used=0,total=0;const days=[];for(let d=new Date(start);d<=end;d=addDays(d,1)){const k=dateKey(d),h=map[k],w=isWeekend(d); total++; let type='vacation',label='Ferie'; if(h){type=h.includes('spesialdag')?'special':'holiday';label=h;} else if(w){type='weekend';label='Helg';} else used++; days.push({date:new Date(d),type,label});}
 return {start,end,used,total,gained:total-used,score:total/Math.max(used,1),days,reason};}
 
@@ -206,7 +227,7 @@ function parsePreferred(year,map){
 const txt=document.getElementById('preferred').value.trim();
 if(!txt) return {periods:selectedDatesToPeriods(year,map),errors:[]};
 const errors=[],periods=[];
-txt.split(/\n+/).forEach((line,i)=>{const m=line.trim().match(/(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/i); if(!m){errors.push(`Linje ${i+1} har feil format.`); return;} const a=new Date(m[1]),b=new Date(m[2]); if(isNaN(a)||isNaN(b)||a>b){errors.push(`Linje ${i+1} har ugyldig datointervall.`); return;} periods.push(evaluatePeriod(a,b,map,'Din ønskede periode'));}); periods.sort((a,b)=>a.start-b.start); return {periods,errors};}
+txt.split(/\n+/).forEach((line,i)=>{const m=line.trim().match(/(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/i); if(!m){errors.push(`Linje ${i+1} har feil format.`); return;} const a=new Date(m[1]),b=new Date(m[2]); if(isNaN(a)||isNaN(b)||a>b){errors.push(`Linje ${i+1} har ugyldig datointervall.`); return;} if(b<today){errors.push(`Linje ${i+1} ble hoppet over fordi perioden allerede har vært.`); return;} const startDate=a<today?new Date(today):a; periods.push(evaluatePeriod(startDate,b,map,'Din ønskede periode'));}); periods.sort((a,b)=>a.start-b.start); return {periods,errors};}
 function overlaps(p,set){return p.days.some(d=>set.has(dateKey(d.date)));}
 function plan(year,available){const includeSpecial=document.getElementById('includeSpecial').checked; const {holidays,map}=holidaysNO(year,includeSpecial); const usedDates=new Set(); const picked=[];
 const preferred=parsePreferred(year,map); let used=0;
@@ -214,6 +235,31 @@ preferred.periods.forEach(p=>{if(!overlaps(p,usedDates)&&used+p.used<=available)
 let left=available-used;
 const candidates=[]; const start=new Date(year,0,1),end=new Date(year,11,31);
 for(let s=new Date(start);s<=end;s=addDays(s,1)){if(!inFilter(s,year)) continue; for(let len=4;len<=18;len++){const e=addDays(s,len-1); if(!inFilter(e,year)) continue; const p=evaluatePeriod(s,e,map,'Smart broperiode'); if(p.used>0&&p.used<=left&&p.gained>=2) candidates.push(p);}}
+const minContinuousWeeks=Number(document.getElementById('minContinuousWeeks').value||0);
+if(minContinuousWeeks>0){
+  const requiredDays=minContinuousWeeks*7;
+  const hasRequired=picked.some(p=>p.total>=requiredDays);
+  if(!hasRequired){
+    let bestLong=null;
+    for(let s=new Date(start);s<=end;s=addDays(s,1)){
+      if(!inFilter(s,year)) continue;
+      for(let len=requiredDays;len<=requiredDays+21;len++){
+        const e=addDays(s,len-1);
+        if(!inFilter(e,year)) continue;
+        const p=evaluatePeriod(s,e,map,`Sammenhengende periode (${minContinuousWeeks} uker)`);
+        if(p.used>left||overlaps(p,usedDates)) continue;
+        if(!bestLong||p.score>bestLong.score||(p.score===bestLong.score&&p.total>bestLong.total)) bestLong=p;
+      }
+    }
+    if(bestLong){
+      picked.push(bestLong);
+      bestLong.days.forEach(d=>usedDates.add(dateKey(d.date)));
+      left-=bestLong.used;
+    }else{
+      preferred.errors.push(`Fant ingen mulig sammenhengende periode på minst ${minContinuousWeeks} uker med dagens filter og antall feriedager.`);
+    }
+  }
+}
 const monthWeight = (m) => (m >= 6 ? 0.2 : 0);
 const avgMonth = (periods) => periods.length ? periods.reduce((sum,p)=>sum+((p.start.getMonth()+p.end.getMonth())/2),0)/periods.length : 5.5;
 for(;;){
