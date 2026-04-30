@@ -1,96 +1,436 @@
+```html
 <!DOCTYPE html>
-
 <html lang="no">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ferieplanlegger 🇳🇴</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
-      font-family: -apple-system, sans-serif;
-      padding: 20px;
-      background: #f2f2f7;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f4f2f8;
       color: #111;
     }
 
+    .app {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 28px 18px 50px;
+    }
+
     h1 {
-      margin-bottom: 10px;
+      font-size: 38px;
+      margin: 20px 0 6px;
+      letter-spacing: -1px;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 17px;
+      margin-bottom: 22px;
     }
 
     .card {
       background: white;
-      padding: 16px;
-      border-radius: 14px;
-      margin-top: 15px;
+      border-radius: 22px;
+      padding: 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.05);
     }
 
-    input, button {
-      padding: 12px;
+    label {
+      display: block;
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    input, select, button {
       width: 100%;
-      margin-top: 8px;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-      font-size: 16px;
+      font-size: 17px;
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid #ddd;
+      margin-bottom: 14px;
     }
 
     button {
-      background: black;
+      background: #111;
       color: white;
       border: none;
+      font-weight: 700;
+      cursor: pointer;
     }
 
-    .result strong {
-      font-size: 18px;
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .summary-box {
+      background: #f5f5f5;
+      border-radius: 16px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .summary-box strong {
+      display: block;
+      font-size: 24px;
+    }
+
+    .summary-box span {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .period {
+      border-left: 5px solid #111;
+    }
+
+    .period h3 {
+      margin: 0 0 8px;
+      font-size: 22px;
+    }
+
+    .meta {
+      color: #555;
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+
+    .gain {
+      display: inline-block;
+      background: #ecfdf3;
+      color: #027a48;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .dates {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .pill {
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 13px;
+      background: #eee;
+    }
+
+    .vacation {
+      background: #d1fadf;
+    }
+
+    .holiday {
+      background: #ede2ff;
+    }
+
+    .weekend {
+      background: #e5e7eb;
+      color: #555;
+    }
+
+    .holiday-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .holiday-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .small {
+      font-size: 13px;
+      color: #666;
+    }
+
+    @media (max-width: 520px) {
+      h1 {
+        font-size: 34px;
+      }
+
+      .summary {
+        grid-template-columns: 1fr;
+      }
+
+      .card {
+        padding: 18px;
+      }
     }
   </style>
-
 </head>
+
 <body>
+  <main class="app">
+    <h1>Ferieplanlegger 🇳🇴</h1>
+    <p class="subtitle">Finn ut hvordan du kan få mest mulig fri ut av feriedagene dine.</p>
 
-<h1>Ferieplanlegger 🇳🇴</h1>
+    <section class="card">
+      <label for="year">År</label>
+      <select id="year"></select>
 
-<div class="card">
-  <label>Antall feriedager</label>
-  <input id="days" type="number" value="10">
+      <label for="days">Hvor mange feriedager har du?</label>
+      <input id="days" type="number" min="1" max="60" value="25" />
 
-<button onclick="calculate()">Finn beste ferie</button>
+      <button onclick="runPlanner()">Finn beste ferieperioder</button>
+    </section>
 
-</div>
+    <section id="result"></section>
+  </main>
 
-<div id="result" class="card result" style="display:none;"></div>
+  <script>
+    const dayNames = ["søn", "man", "tir", "ons", "tor", "fre", "lør"];
+    const monthNames = ["jan", "feb", "mar", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "des"];
 
-<script>
-function calculate() {
-  const days = parseInt(document.getElementById("days").value);
+    const yearSelect = document.getElementById("year");
+    const currentYear = new Date().getFullYear();
 
-  if (!days || days <= 0) return;
+    for (let y = currentYear; y <= currentYear + 3; y++) {
+      const option = document.createElement("option");
+      option.value = y;
+      option.textContent = y;
+      yearSelect.appendChild(option);
+    }
 
-  // Simulert smart ferieutnyttelse
-  // Antar at du plasserer dagene rundt helger
-  const weekends = Math.floor(days * 2); // hver ferie gir ca 2 ekstra helgedager
-  const holidaysBonus = Math.floor(days * 0.3); // effekt av helligdager
+    function dateKey(date) {
+      return date.toISOString().slice(0, 10);
+    }
 
-  const totalFree = days + weekends + holidaysBonus;
-  const gained = totalFree - days;
+    function addDays(date, days) {
+      const d = new Date(date);
+      d.setDate(d.getDate() + days);
+      return d;
+    }
 
-  const result = document.getElementById("result");
-  result.style.display = "block";
+    function formatDate(date) {
+      return `${date.getDate()}. ${monthNames[date.getMonth()]}`;
+    }
 
-  result.innerHTML = `
-    <h2>Resultat</h2>
-    <p>Brukte feriedager: ${days}</p>
-    <p>Total sammenhengende fri: ${totalFree} dager</p>
-    <p><strong>Du har “tjent” ${gained} ekstra fridager 🎉</strong></p>
+    function isWeekend(date) {
+      return date.getDay() === 0 || date.getDay() === 6;
+    }
 
-    <hr style="margin:15px 0;">
+    function easterSunday(year) {
+      const a = year % 19;
+      const b = Math.floor(year / 100);
+      const c = year % 100;
+      const d = Math.floor(b / 4);
+      const e = b % 4;
+      const f = Math.floor((b + 8) / 25);
+      const g = Math.floor((b - f + 1) / 3);
+      const h = (19 * a + b - d - g + 15) % 30;
+      const i = Math.floor(c / 4);
+      const k = c % 4;
+      const l = (32 + 2 * e + 2 * i - h - k) % 7;
+      const m = Math.floor((a + 11 * h + 22 * l) / 451);
+      const month = Math.floor((h + l - 7 * m + 114) / 31);
+      const day = ((h + l - 7 * m + 114) % 31) + 1;
+      return new Date(year, month - 1, day);
+    }
 
-    <p>💡 Tips:</p>
-    <p>Legg ferie rundt helger og helligdager for maksimal effekt.</p>
-  `;
-}
-</script>
+    function norwegianHolidays(year) {
+      const easter = easterSunday(year);
 
+      const holidays = [
+        { date: new Date(year, 0, 1), name: "Nyttårsdag" },
+        { date: addDays(easter, -3), name: "Skjærtorsdag" },
+        { date: addDays(easter, -2), name: "Langfredag" },
+        { date: addDays(easter, 0), name: "1. påskedag" },
+        { date: addDays(easter, 1), name: "2. påskedag" },
+        { date: new Date(year, 4, 1), name: "Arbeidernes dag" },
+        { date: new Date(year, 4, 17), name: "17. mai" },
+        { date: addDays(easter, 39), name: "Kristi himmelfartsdag" },
+        { date: addDays(easter, 49), name: "1. pinsedag" },
+        { date: addDays(easter, 50), name: "2. pinsedag" },
+        { date: new Date(year, 11, 25), name: "1. juledag" },
+        { date: new Date(year, 11, 26), name: "2. juledag" }
+      ];
+
+      const map = {};
+      holidays.forEach(h => {
+        map[dateKey(h.date)] = h.name;
+      });
+
+      return { holidays, map };
+    }
+
+    function countVacationDays(start, end, holidayMap) {
+      let used = 0;
+      let total = 0;
+      let holidays = 0;
+      let weekends = 0;
+      let days = [];
+
+      for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
+        const key = dateKey(d);
+        const weekend = isWeekend(d);
+        const holiday = holidayMap[key];
+
+        total++;
+
+        if (weekend) weekends++;
+        else if (holiday) holidays++;
+        else used++;
+
+        days.push({
+          date: new Date(d),
+          type: weekend ? "weekend" : holiday ? "holiday" : "vacation",
+          label: holiday || (weekend ? "Helg" : "Ferie")
+        });
+      }
+
+      return {
+        start,
+        end,
+        used,
+        total,
+        gained: total - used,
+        weekends,
+        holidays,
+        days,
+        score: total / Math.max(used, 1)
+      };
+    }
+
+    function findBestPeriods(year, availableDays) {
+      const { map } = norwegianHolidays(year);
+      const candidates = [];
+
+      const startDate = new Date(year, 0, 1);
+      const endDate = new Date(year, 11, 31);
+
+      for (let start = new Date(startDate); start <= endDate; start = addDays(start, 1)) {
+        for (let length = 3; length <= 24; length++) {
+          const end = addDays(start, length - 1);
+          if (end.getFullYear() > year && end.getMonth() > 0) continue;
+
+          const period = countVacationDays(start, end, map);
+
+          if (period.used > 0 && period.used <= availableDays && period.total >= 5) {
+            candidates.push(period);
+          }
+        }
+      }
+
+      candidates.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        if (b.gained !== a.gained) return b.gained - a.gained;
+        return b.total - a.total;
+      });
+
+      const selected = [];
+      let usedDates = new Set();
+      let daysLeft = availableDays;
+
+      for (const candidate of candidates) {
+        if (candidate.used > daysLeft) continue;
+
+        const overlaps = candidate.days.some(d => usedDates.has(dateKey(d.date)));
+        if (overlaps) continue;
+
+        selected.push(candidate);
+        daysLeft -= candidate.used;
+        candidate.days.forEach(d => usedDates.add(dateKey(d.date)));
+
+        if (selected.length >= 6 || daysLeft <= 0) break;
+      }
+
+      return selected;
+    }
+
+    function runPlanner() {
+      const year = Number(document.getElementById("year").value);
+      const availableDays = Number(document.getElementById("days").value);
+      const result = document.getElementById("result");
+
+      if (!availableDays || availableDays < 1) {
+        result.innerHTML = `<section class="card">Skriv inn minst 1 feriedag.</section>`;
+        return;
+      }
+
+      const periods = findBestPeriods(year, availableDays);
+      const holidayData = norwegianHolidays(year);
+
+      const totalUsed = periods.reduce((sum, p) => sum + p.used, 0);
+      const totalFree = periods.reduce((sum, p) => sum + p.total, 0);
+      const totalGained = totalFree - totalUsed;
+
+      result.innerHTML = `
+        <section class="card">
+          <h2>Resultat for ${year}</h2>
+          <p class="small">Basert på norske helligdager, helger og hvor mange feriedager du har tilgjengelig.</p>
+
+          <div class="summary">
+            <div class="summary-box">
+              <strong>${totalUsed}</strong>
+              <span>feriedager brukt</span>
+            </div>
+            <div class="summary-box">
+              <strong>${totalFree}</strong>
+              <span>totale fridager</span>
+            </div>
+            <div class="summary-box">
+              <strong>${totalGained}</strong>
+              <span>ekstra dager tjent</span>
+            </div>
+          </div>
+        </section>
+
+        ${periods.map((p, index) => `
+          <section class="card period">
+            <div class="gain">${p.score.toFixed(1)}x utnyttelse</div>
+            <h3>${index + 1}. ${formatDate(p.start)} – ${formatDate(p.end)}</h3>
+            <div class="meta">
+              Bruk ${p.used} feriedag${p.used === 1 ? "" : "er"} og få ${p.total} dager fri.<br>
+              Du tjener ${p.gained} ekstra dag${p.gained === 1 ? "" : "er"} fra helger og helligdager.
+            </div>
+
+            <div class="dates">
+              ${p.days.map(d => `
+                <span class="pill ${d.type}">
+                  ${dayNames[d.date.getDay()]} ${d.date.getDate()}. ${monthNames[d.date.getMonth()]}
+                </span>
+              `).join("")}
+            </div>
+          </section>
+        `).join("")}
+
+        <section class="card">
+          <h2>Helligdager i ${year}</h2>
+          <div class="holiday-list">
+            ${holidayData.holidays
+              .sort((a, b) => a.date - b.date)
+              .map(h => `
+                <div class="holiday-row">
+                  <strong>${formatDate(h.date)}</strong>
+                  <span>${h.name}</span>
+                </div>
+              `).join("")}
+          </div>
+        </section>
+      `;
+    }
+
+    runPlanner();
+  </script>
 </body>
 </html>
-
+```
