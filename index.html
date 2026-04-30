@@ -234,6 +234,46 @@ if(!txt) return {periods:selectedDatesToPeriods(year,map),errors:[]};
 const errors=[],periods=[];
 txt.split(/\n+/).forEach((line,i)=>{const m=line.trim().match(/(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/i); if(!m){errors.push(`Linje ${i+1} har feil format.`); return;} const a=new Date(m[1]),b=new Date(m[2]); if(isNaN(a)||isNaN(b)||a>b){errors.push(`Linje ${i+1} har ugyldig datointervall.`); return;} if(b<today){errors.push(`Linje ${i+1} ble hoppet over fordi perioden allerede har vært.`); return;} const startDate=a<today?new Date(today):a; periods.push(evaluatePeriod(startDate,b,map,'Din ønskede periode'));}); periods.sort((a,b)=>a.start-b.start); return {periods,errors};}
 function overlaps(p,set){return p.days.some(d=>set.has(dateKey(d.date)));}
+function isoWeekKey(d){
+  const tmp=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const day=(tmp.getUTCDay()+6)%7;
+  tmp.setUTCDate(tmp.getUTCDate()-day+3);
+  const firstThursday=new Date(Date.UTC(tmp.getUTCFullYear(),0,4));
+  const firstDay=(firstThursday.getUTCDay()+6)%7;
+  firstThursday.setUTCDate(firstThursday.getUTCDate()-firstDay+3);
+  const week=1+Math.round((tmp-firstThursday)/(7*24*60*60*1000));
+  return `${tmp.getUTCFullYear()}-W${String(week).padStart(2,'0')}`;
+}
+function longestThuFriStreak(picked, candidate){
+  const offByWeek=new Map();
+  const allPeriods=candidate ? [...picked, candidate] : picked;
+  allPeriods.forEach(period=>{
+    period.days.forEach(({date,type})=>{
+      if(type!=='vacation') return;
+      const dow=date.getDay();
+      if(dow!==4&&dow!==5) return;
+      const wk=isoWeekKey(date);
+      if(!offByWeek.has(wk)) offByWeek.set(wk,new Set());
+      offByWeek.get(wk).add(dow);
+    });
+  });
+  const markedWeeks=[...offByWeek.entries()]
+    .filter(([,days])=>days.has(4)&&days.has(5))
+    .map(([wk])=>wk)
+    .sort();
+  let best=0,cur=0;
+  for(let i=0;i<markedWeeks.length;i++){
+    if(i===0){cur=1;best=1;continue;}
+    const [y,w]=markedWeeks[i].split('-W').map(Number);
+    const [py,pw]=markedWeeks[i-1].split('-W').map(Number);
+    const prevDate=new Date(Date.UTC(py,0,4+(pw-1)*7));
+    const curDate=new Date(Date.UTC(y,0,4+(w-1)*7));
+    const diff=Math.round((curDate-prevDate)/(7*24*60*60*1000));
+    cur=(diff===1)?cur+1:1;
+    if(cur>best) best=cur;
+  }
+  return best;
+}
 function plan(year,available){const includeSpecial=document.getElementById('includeSpecial').checked; const {holidays,map}=holidaysNO(year,includeSpecial); const usedDates=new Set(); const picked=[];
 const preferred=parsePreferred(year,map); let used=0;
 const groupingPreference=Number(document.getElementById('groupingPreference').value||100)/100;
@@ -277,7 +317,9 @@ for(;;){
     const spreadBoost=Math.max(0,cMid-currentAvg)*0.03;
     const groupingBonus=(c.total-c.used)*0.03 + c.total*0.02;
     const sporadicBonus=(cMid/12)*0.35 + (c.used*0.01) - (c.total*0.015);
-    const balancedScore=c.score+monthWeight(cMid)+spreadBoost+(c.gained*0.01)-(c.used*0.005)+(groupingBonus*groupingPreference)+(sporadicBonus*(1-groupingPreference));
+    const thuFriStreak=longestThuFriStreak(picked,c);
+    const lockInPenalty=thuFriStreak>=4 ? Math.pow(thuFriStreak-3,1.4)*0.6 : 0;
+    const balancedScore=c.score+monthWeight(cMid)+spreadBoost+(c.gained*0.01)-(c.used*0.005)+(groupingBonus*groupingPreference)+(sporadicBonus*(1-groupingPreference))-lockInPenalty;
     if(!best||balancedScore>best.balancedScore||(balancedScore===best.balancedScore&&cMid>best.cMid)){
       best={period:c,balancedScore,cMid};
     }
