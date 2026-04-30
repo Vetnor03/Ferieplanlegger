@@ -138,6 +138,11 @@
           <option value="4">Minst 4 uker</option>
         </select>
       </div>
+      <div>
+        <label for="groupingPreference">Gradering: sporadisk ↔ manager-pleaser</label>
+        <input id="groupingPreference" type="range" min="0" max="100" value="100" />
+        <p class="help" id="groupingPreferenceHelp">100: prioriterer større sammenhengende perioder med færre korte opphold tilbake på jobb.</p>
+      </div>
 
       <div class="form-cols" id="customRange" style="display:none;">
         <div><label for="customStart">Fra dato</label><input id="customStart" type="date" /></div>
@@ -231,6 +236,7 @@ txt.split(/\n+/).forEach((line,i)=>{const m=line.trim().match(/(\d{4}-\d{2}-\d{2
 function overlaps(p,set){return p.days.some(d=>set.has(dateKey(d.date)));}
 function plan(year,available){const includeSpecial=document.getElementById('includeSpecial').checked; const {holidays,map}=holidaysNO(year,includeSpecial); const usedDates=new Set(); const picked=[];
 const preferred=parsePreferred(year,map); let used=0;
+const groupingPreference=Number(document.getElementById('groupingPreference').value||100)/100;
 preferred.periods.forEach(p=>{if(!overlaps(p,usedDates)&&used+p.used<=available){picked.push(p); p.days.forEach(d=>usedDates.add(dateKey(d.date))); used+=p.used;}});
 let left=available-used;
 const candidates=[]; const start=new Date(year,0,1),end=new Date(year,11,31);
@@ -269,7 +275,9 @@ for(;;){
     if(c.used>left||overlaps(c,usedDates)) continue;
     const cMid=(c.start.getMonth()+c.end.getMonth())/2;
     const spreadBoost=Math.max(0,cMid-currentAvg)*0.03;
-    const balancedScore=c.score+monthWeight(cMid)+spreadBoost+(c.gained*0.01)-(c.used*0.005);
+    const groupingBonus=(c.total-c.used)*0.03 + c.total*0.02;
+    const sporadicBonus=(cMid/12)*0.35 + (c.used*0.01) - (c.total*0.015);
+    const balancedScore=c.score+monthWeight(cMid)+spreadBoost+(c.gained*0.01)-(c.used*0.005)+(groupingBonus*groupingPreference)+(sporadicBonus*(1-groupingPreference));
     if(!best||balancedScore>best.balancedScore||(balancedScore===best.balancedScore&&cMid>best.cMid)){
       best={period:c,balancedScore,cMid};
     }
@@ -395,6 +403,18 @@ function clearSelectedDays(){ selectedDates.clear(); renderCalendar(); }
 
 yearSel.addEventListener('change',()=>{pickerMonth=0; clearSelectedDays(); renderCalendar(); runPlanner();});
 document.getElementById('includeSpecial').addEventListener('change',()=>{renderCalendar(); runPlanner();});
+document.getElementById('groupingPreference').addEventListener('input',(e)=>{
+  const v=Number(e.target.value||100);
+  const help=document.getElementById('groupingPreferenceHelp');
+  if(v===0){
+    help.textContent='0: prioriterer sporadiske fridager og maksimerer antall fridager uten fokus på samling.';
+  }else if(v===100){
+    help.textContent='100: prioriterer større sammenhengende perioder med færre korte opphold tilbake på jobb.';
+  }else{
+    help.textContent=`${v}: balanserer mellom sporadisk bruk og sammenhengende ferieblokker.`;
+  }
+  runPlanner();
+});
 renderCalendar();
 runPlanner();
 </script>
