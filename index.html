@@ -99,8 +99,33 @@
     .month-nav { display:flex; align-items:center; justify-content:space-between; gap:8px; margin: 8px 0; }
     .month-nav button { width:auto; padding:8px 12px; border-radius:10px; }
     .month-label { font-weight:700; text-transform: capitalize; }
-    .loading-wrap { display:flex; align-items:center; gap:10px; color: var(--muted); font-weight:600; }
-    .spinner { width:18px; height:18px; border:2px solid #d1d5db; border-top-color:#111827; border-radius:50%; animation:spin .7s linear infinite; }
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(243, 244, 246, 0.6);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 150ms ease;
+      z-index: 30;
+    }
+    .loading-overlay.visible { opacity: 1; pointer-events: auto; }
+    .loading-card {
+      background: rgba(255,255,255,0.92);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-weight: 600;
+      box-shadow: 0 8px 24px rgba(17,24,39,0.09);
+      backdrop-filter: blur(2px);
+    }
+    .spinner { width:16px; height:16px; border:2px solid #c4b5fd; border-top-color:#4f46e5; border-right-color:#7c3aed; border-radius:50%; animation:spin .7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     @media (min-width: 740px) {
       .app { padding: 26px 22px calc(36px + env(safe-area-inset-bottom)); }
@@ -198,6 +223,12 @@
 
   <section id="result"></section>
 </main>
+<div id="loadingOverlay" class="loading-overlay" aria-live="polite" aria-hidden="true">
+  <div class="loading-card">
+    <span class="spinner" aria-hidden="true"></span>
+    <span>Planlegger ferien din…</span>
+  </div>
+</div>
 <script>
 const dayNames=["søn","man","tir","ons","tor","fre","lør"]; const monthNames=["jan","feb","mar","apr","mai","jun","jul","aug","sep","okt","nov","des"];
 const yearSel=document.getElementById('year'); const nowY=new Date().getFullYear(); for(let y=nowY;y<=nowY+3;y++){yearSel.add(new Option(String(y),String(y)));}
@@ -208,7 +239,9 @@ today.setHours(0,0,0,0);
 const dateKey=d=>d.toISOString().slice(0,10); const addDays=(d,n)=>{const x=new Date(d); x.setDate(x.getDate()+n); return x;}; const isWeekend=d=>d.getDay()===0||d.getDay()===6;
 const selectedDates = new Set();
 const DEBUG_PLANNER = false;
+const DEBUG_LOADING = false;
 function plannerDebug(...args){ if(DEBUG_PLANNER) console.log('[PLANNER]',...args); }
+function loadingDebug(...args){ if(DEBUG_LOADING) console.log(...args); }
 const PLANNER_LIMITS = {
   maxCandidatePeriods: 1800,
   maxBeamWidth: 28,
@@ -541,21 +574,49 @@ const highConcentrationWarning = chosen.scored.metrics.topPeriodShare>0.7
 return {picked,left:chosen.left,totalUsed:chosen.scored.used,totalFree:chosen.scored.free,totalGained:chosen.scored.free-chosen.scored.used,eff:chosen.scored.free/Math.max(chosen.scored.used,1),holidays,errors:preferred.errors,metrics:chosen.scored.metrics,explanation,leftoverExplanation,qualityLabel:labels[chosen.strategy]||'Anbefalt plan',highConcentrationWarning};
 }
 const formatDate=d=>`${d.getDate()}. ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
-function runPlanner(){const year=Number(document.getElementById('year').value),days=Number(document.getElementById('days').value),transferDays=Number(document.getElementById('transferDays').value||0),out=document.getElementById('result');
+async function runPlanner(){const year=Number(document.getElementById('year').value),days=Number(document.getElementById('days').value),transferDays=Number(document.getElementById('transferDays').value||0),out=document.getElementById('result');
 const button=document.querySelector('button[onclick="runPlanner()"]');
-const minLoadingMs=350;
+const overlay=document.getElementById('loadingOverlay');
+const spinnerDelayMs=200;
+const minVisibleMs=500;
+const hardTimeoutMs=2500;
+let isLoading=false;
+let isSpinnerVisible=false;
+let spinnerShownAt=0;
+let delayTimer=null;
 const startedAt=performance.now();
-function setLoading(isLoading){
-  if(button){ button.disabled=!!isLoading; button.setAttribute('aria-busy',isLoading?'true':'false'); }
-  if(isLoading){
-    out.innerHTML='<section class="card"><div class="loading-wrap"><span class="spinner"></span><span>Lager ferieplan...</span></div></section>';
-  }
+function setLoading(next){
+  isLoading=!!next;
+  if(button){ button.disabled=isLoading; button.setAttribute('aria-busy',isLoading?'true':'false'); }
 }
+function showSpinner(){
+  if(!overlay || isSpinnerVisible || !isLoading) return;
+  overlay.classList.add('visible');
+  overlay.setAttribute('aria-hidden','false');
+  isSpinnerVisible=true;
+  spinnerShownAt=performance.now();
+  loadingDebug('spinner shown');
+}
+function hideSpinner(){
+  if(!overlay || !isSpinnerVisible) return;
+  overlay.style.transitionDuration='200ms';
+  overlay.classList.remove('visible');
+  overlay.setAttribute('aria-hidden','true');
+  isSpinnerVisible=false;
+}
+loadingDebug('planner started');
 setLoading(true);
-setTimeout(()=>{ try{ if(!days||days<1){out.innerHTML='<section class="card">Legg inn minst 1 feriedag.</section>'; return;} if(transferDays<0||transferDays>days){out.innerHTML=`<section class="card">Overføringsdager må være mellom 0 og ${days}.</section>`; return;} const available=Math.max(0,days-transferDays); const res=plan(year,available);
+delayTimer=setTimeout(()=>{ if(isLoading) showSpinner(); },spinnerDelayMs);
+try{ if(!days||days<1){out.innerHTML='<section class="card">Legg inn minst 1 feriedag.</section>'; return;} if(transferDays<0||transferDays>days){out.innerHTML=`<section class="card">Overføringsdager må være mellom 0 og ${days}.</section>`; return;} const available=Math.max(0,days-transferDays); const res=plan(year,available);
 if(!res||!Array.isArray(res.picked)){ throw new Error('Planner returned invalid result'); }
 if(res.picked.length===0){
   out.innerHTML='<section class="card">Fant ingen gyldig ferieplan. Prøv færre krav eller et smalere datointervall.</section>';
+  return;
+}
+const durationMs=Math.round(performance.now()-startedAt);
+loadingDebug(`planner finished in ${durationMs} ms`);
+if(durationMs>hardTimeoutMs){
+  out.innerHTML='<section class="card">Planlegging tok for lang tid. Prøv igjen.</section>';
   return;
 }
 const resultDates=new Set(res.picked.flatMap(p=>p.days.map(d=>dateKey(d.date))));
@@ -585,11 +646,16 @@ renderResultCalendar(year, resultDates);
 } catch(err){
   console.error(err);
   plannerDebug('runPlanner error',err);
-  out.innerHTML='<section class="card">Planlegging tok for lang tid. Prøv færre krav eller et smalere datointervall.</section>';
+  out.innerHTML='<section class="card">Planlegging tok for lang tid. Prøv igjen.</section>';
 } finally{
-  const remaining=Math.max(0,minLoadingMs-(performance.now()-startedAt));
-  setTimeout(()=>setLoading(false),remaining);
-}}, 0);
+  if(delayTimer){ clearTimeout(delayTimer); }
+  setLoading(false);
+  const remaining=isSpinnerVisible?Math.max(0,minVisibleMs-(performance.now()-spinnerShownAt)):0;
+  setTimeout(()=>{
+    hideSpinner();
+    loadingDebug('loading stopped');
+  },remaining);
+}
 }
 
 function renderResultCalendar(year, resultDates){
