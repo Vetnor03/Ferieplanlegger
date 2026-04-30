@@ -135,7 +135,7 @@
       </div>
 
       <div>
-        <label for="season">Ønsket periodefilter</label>
+        <label for="season">Valgt periode (må inkluderes)</label>
         <select id="season">
           <option value="all">Hele året</option>
           <option value="spring">Vår (mars–mai)</option>
@@ -156,9 +156,9 @@
         </select>
       </div>
       <div>
-        <label for="groupingPreference">Unngå delvise uker</label>
+        <label for="groupingPreference">Spredning</label>
         <input id="groupingPreference" type="range" min="0" max="100" value="100" />
-        <p class="help" id="groupingPreferenceHelp">100: prioriterer hele ferieuker og færre delvise arbeidsuker.</p>
+        <p class="help" id="groupingPreferenceHelp">0: spre ferien gjennom året. 100: grupper ferien i lengre sammenhengende blokker.</p>
       </div>
 
       <div class="form-cols" id="customRange" style="display:none;">
@@ -339,11 +339,25 @@ function analyzePlan(periods,map){
     if(gap>=0 && gap<=6) shortGapPenalty += (7-gap);
   }
   let spreadPenalty=0;
+  const monthCounts=new Array(12).fill(0);
   const quarterCounts=[0,0,0,0];
-  vacationDates.forEach(d=>quarterCounts[Math.floor(d.getMonth()/3)]++);
+  vacationDates.forEach(d=>{
+    monthCounts[d.getMonth()]++;
+    quarterCounts[Math.floor(d.getMonth()/3)]++;
+  });
   const mean=quarterCounts.reduce((a,b)=>a+b,0)/4;
   spreadPenalty=quarterCounts.reduce((s,v)=>s+Math.abs(v-mean),0)/Math.max(mean,1);
-  return {fullCount,partialCount,consecutivePartialPairs,partialClusterPenalty,isolatedWorkdayPenalty,shortGapPenalty,spreadPenalty};
+  const usedMonths=monthCounts.filter(v=>v>0).length;
+  const sortedMonths=[...monthCounts].sort((a,b)=>b-a);
+  const topTwoShare=(sortedMonths[0]+sortedMonths[1]) / Math.max(vacationDates.length,1);
+  const monthMean=vacationDates.length/12;
+  const monthConcentrationPenalty=monthCounts.reduce((sum,v)=>sum+Math.max(0,v-monthMean*1.45),0)/Math.max(vacationDates.length,1);
+  const longestBlock=Math.max(0,...periods.map(p=>p.used));
+  const periodUsed=periods.map(p=>p.used).sort((a,b)=>b-a);
+  const topPeriodShare=(periodUsed[0]||0)/Math.max(vacationDates.length,1);
+  const topTwoPeriodShare=((periodUsed[0]||0)+(periodUsed[1]||0))/Math.max(vacationDates.length,1);
+  const consecutivePartialRatio=partialCount>0 ? consecutivePartialPairs/partialCount : 0;
+  return {fullCount,partialCount,consecutivePartialPairs,partialClusterPenalty,isolatedWorkdayPenalty,shortGapPenalty,spreadPenalty,monthCounts,usedMonths,topTwoShare,monthConcentrationPenalty,longestBlock,topPeriodShare,topTwoPeriodShare,consecutivePartialRatio};
 }
 function plan(year,available){const includeSpecial=document.getElementById('includeSpecial').checked; const {holidays,map}=holidaysNO(year,includeSpecial); const usedDates=new Set(); const picked=[];
 const preferred=parsePreferred(year,map); let used=0;
@@ -384,26 +398,33 @@ for(;;){
     const scenario=[...picked,c].sort((a,b)=>a.start-b.start);
     const metrics=analyzePlan(scenario,map);
     const connectsToHolidayOrWeekend=c.days.some(d=>d.type==='holiday'||d.type==='weekend'||d.type==='special');
-    const longBlockBonus=Math.max(0,c.total-6)*0.35;
-    const fullWeekBonus=metrics.fullCount*2.8;
-    const partialPenalty=metrics.partialCount*(0.9+groupingPreference*2.2);
-    const consecutivePenalty=metrics.consecutivePartialPairs*(0.8+groupingPreference*6);
-    const clusteredPenalty=metrics.partialClusterPenalty*(0.25+groupingPreference*1.6);
-    const shortGapPenalty=metrics.shortGapPenalty*(0.08+groupingPreference*0.55);
-    const unevenPenalty=metrics.spreadPenalty*(0.12+groupingPreference*0.55);
-    const isolatedPenalty=metrics.isolatedWorkdayPenalty*(0.15+groupingPreference*1.4);
+    const spreadMode=1-groupingPreference;
+    const longBlockBonus=Math.max(0,c.total-6)*(0.12+groupingPreference*0.55);
+    const fullWeekBonus=metrics.fullCount*(0.7+groupingPreference*3.8);
+    const partialPenalty=metrics.partialCount*(0.45+groupingPreference*1.9);
+    const consecutivePenalty=metrics.consecutivePartialPairs*(1.9+spreadMode*4.4+groupingPreference*1.2);
+    const clusteredPenalty=metrics.partialClusterPenalty*(0.45+spreadMode*1.8+groupingPreference*0.8);
+    const shortGapPenalty=metrics.shortGapPenalty*(0.12+groupingPreference*0.45);
+    const unevenPenalty=metrics.spreadPenalty*(0.35+spreadMode*3.1);
+    const isolatedPenalty=metrics.isolatedWorkdayPenalty*(0.22+groupingPreference*1.3);
+    const biggestBlockPenalty=Math.max(0,metrics.longestBlock-10)*(0.08+spreadMode*0.95);
+    const monthConcentrationPenalty=metrics.monthConcentrationPenalty*(2.2+spreadMode*8.5);
+    const topMonthSharePenalty=Math.max(0,metrics.topTwoShare-0.52)*(1.2+spreadMode*7.8);
+    const topPeriodSharePenalty=Math.max(0,metrics.topTwoPeriodShare-0.62)*(1.6+spreadMode*9.6);
+    const singlePeriodPenalty=Math.max(0,metrics.topPeriodShare-0.45)*(1.1+spreadMode*8.4);
+    const monthSpreadBonus=(metrics.usedMonths/12)*(0.8+spreadMode*5.5);
+    const seasonalSpreadBonus=(1-Math.min(metrics.spreadPenalty/6,1))*(0.4+spreadMode*4.2);
+    const antiHalfWeekChainPenalty=metrics.consecutivePartialRatio*(0.2+spreadMode*3.8);
     const holidayConnectionBonus=connectsToHolidayOrWeekend?0.6:0;
     const leverageScore=c.gained*1.25 - c.used*0.12;
-    const baseValue=(leverageScore + longBlockBonus + holidayConnectionBonus + fullWeekBonus);
-    const realismCost=partialPenalty+consecutivePenalty+clusteredPenalty+shortGapPenalty+unevenPenalty+isolatedPenalty;
-    const efficiencyModeScore=(c.gained*2.4)+(c.total*0.45)-(c.used*0.08)+(connectsToHolidayOrWeekend?0.8:0);
+    const baseValue=(leverageScore + longBlockBonus + holidayConnectionBonus + fullWeekBonus + monthSpreadBonus + seasonalSpreadBonus);
+    const realismCost=partialPenalty+consecutivePenalty+clusteredPenalty+shortGapPenalty+unevenPenalty+isolatedPenalty+biggestBlockPenalty+monthConcentrationPenalty+topMonthSharePenalty+topPeriodSharePenalty+singlePeriodPenalty+antiHalfWeekChainPenalty;
+    const efficiencyModeScore=(c.gained*2.3)+(c.total*0.38)-(c.used*0.08)+(connectsToHolidayOrWeekend?0.8:0)+(metrics.fullCount*groupingPreference*0.9);
     const realismModeScore=(baseValue*0.9)-realismCost;
     const preferenceBlend=Math.min(Math.max(groupingPreference,0),1);
-    const spreadBonus=(1-metrics.spreadPenalty)*0.9;
-    const ignorePartialModeScore=(c.gained*2.7)+(c.total*0.55)-(c.used*0.06)+(connectsToHolidayOrWeekend?0.4:0)+spreadBonus;
-    const balancedScore=groupingPreference===0
-      ? ignorePartialModeScore
-      : (efficiencyModeScore*(1-preferenceBlend))+(realismModeScore*preferenceBlend);
+    const spreadBonus=(1-Math.min(metrics.spreadPenalty/5,1))*4.5 + monthSpreadBonus;
+    const lowSpreadModeScore=(c.gained*1.95)+(c.total*0.22)-(c.used*0.15)+(connectsToHolidayOrWeekend?0.25:0)+spreadBonus-realityCostGuard(realismCost);
+    const balancedScore=(lowSpreadModeScore*(1-preferenceBlend))+(efficiencyModeScore*preferenceBlend*0.6)+(realismModeScore*preferenceBlend*0.4);
     if(!best||balancedScore>best.balancedScore){
       best={period:c,balancedScore};
     }
@@ -414,6 +435,9 @@ for(;;){
   c.days.forEach(d=>usedDates.add(dateKey(d.date)));
   left-=c.used;
   if(left===0) break;
+}
+function realityCostGuard(value){
+  return Math.max(0,value*0.6);
 }
 if(left>0){const fillers=[]; for(let s=new Date(start);s<=end;s=addDays(s,1)){if(!inFilter(s,year)) continue; for(let len=left;len<=Math.min(24,left+10);len++){const e=addDays(s,len-1); if(!inFilter(e,year)) continue; const p=evaluatePeriod(s,e,map,'Utfylling for å bruke restdager'); if(p.used===left&&!overlaps(p,usedDates)) fillers.push(p);}}
 fillers.sort((a,b)=>b.total-a.total||b.gained-a.gained); if(fillers[0]){const f=fillers[0]; picked.push(f); f.days.forEach(d=>usedDates.add(dateKey(d.date))); left=0;}}
@@ -437,7 +461,7 @@ const summaryCards=[
   {label:'Effektivitet', value:`${res.eff.toFixed(2)}x`}
 ];
 const transferText=transferDays>0?`<p class="summary-help">${transferDays} feriedager holdes av til neste år.</p>`:'';
-out.innerHTML=`<section class="card"><h2>Resultat</h2><p class="muted">Planen bruker feriedagene dine på de periodene som gir mest sammenhengende fri, samtidig som den prøver å unngå for mange delvise uker.</p>
+out.innerHTML=`<section class="card"><h2>Resultat</h2><p class="muted">Planen inkluderer valgt periode, men fordeler resten av ferien etter spredning: lav verdi sprer gjennom året, høy verdi grupperer i lengre blokker.</p>
 <div class="summary">${summaryCards.map(card=>`<div class="box"><strong>${card.value}</strong><span>${card.label}</span></div>`).join('')}</div>
 <p class="summary-help">Effektivitet viser hvor mange kalenderdager fri du får per brukt feriedag.</p>
 ${transferText}
@@ -537,11 +561,11 @@ document.getElementById('groupingPreference').addEventListener('input',(e)=>{
   const v=Number(e.target.value||100);
   const help=document.getElementById('groupingPreferenceHelp');
   if(v===0){
-    help.textContent='0: ignorerer delvise uker og maksimerer mest mulig fri med høy brodags-effekt.';
+    help.textContent='0: maksimal spredning. Inkluder valgt periode, men fordel resten av dagene bredt i året.';
   }else if(v===100){
-    help.textContent='100: prioriterer hele ferieuker, færre delvise uker og mer realistisk jevn fordeling.';
+    help.textContent='100: maksimal gruppering. Prioriter lengre sammenhengende ferieblokker og flere hele uker.';
   }else{
-    help.textContent=`${v}: gradvis sterkere straff for delvise uker og tettliggende ferieblokker.`;
+    help.textContent=`${v}: lavere verdi = mer spredning, høyere verdi = mer gruppering i blokker.`;
   }
 });
 document.getElementById('transferDays').addEventListener('input',()=>{document.getElementById('result').innerHTML='';});
