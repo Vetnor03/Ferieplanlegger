@@ -805,7 +805,11 @@ function startLoadingUi(){
       subtextNode.textContent=subtexts[subtextIndex];
     },300);
   }
-  delayTimer=setTimeout(()=>{ if(isLoading) showSpinner(); },spinnerDelayMs);
+  if(FORCE_LOADING_PREVIEW){
+    showSpinner();
+  } else {
+    delayTimer=setTimeout(()=>{ if(isLoading) showSpinner(); },spinnerDelayMs);
+  }
 }
 function stopLoadingUi(){
   if(delayTimer){ clearTimeout(delayTimer); }
@@ -842,6 +846,7 @@ function hideSpinner(){
 loadingDebug('planner started');
 try{
 startLoadingUi();
+await new Promise(requestAnimationFrame);
 if(!days||days<1){out.innerHTML='<section class="card">Legg inn minst 1 feriedag.</section>'; return;} if(transferDays<0||transferDays>days){out.innerHTML=`<section class="card">Overføringsdager må være mellom 0 og ${days}.</section>`; return;} const available=Math.max(0,days-transferDays); const res=plan(year,available);
 if(!res||!Array.isArray(res.picked)){ throw new Error('Planner returned invalid result'); }
 if(res.picked.length===0){
