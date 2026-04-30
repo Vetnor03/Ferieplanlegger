@@ -90,7 +90,8 @@
     .calendar-day.weekend { background: var(--weekend); color: var(--weekend-strong); }
     .calendar-day.holiday { background: var(--holiday); color: var(--holiday-strong); }
     .calendar-day.special { background: var(--special); color: var(--special-strong); }
-    .calendar-day.selected { outline: 2px solid #16a34a; background: var(--selected); color: var(--vac-strong); }
+    .calendar-day.selected { outline: 2px solid #16a34a; outline-offset: -2px; }
+    .calendar-day.selected:not(.weekend):not(.holiday):not(.special) { background: var(--selected); color: var(--vac-strong); }
     .calendar-day small { display:block; color: var(--muted); font-size:0.7rem; }
     .weekday-head { text-align:center; color: var(--muted); font-size:0.75rem; margin-bottom:4px; }
     .calendar-actions { display:flex; gap:8px; flex-wrap: wrap; }
@@ -719,7 +720,7 @@ if(res.picked.length===0){
 }
 const durationMs=Math.round(performance.now()-startedAt);
 loadingDebug(`planner finished in ${durationMs} ms`);
-const resultDates=new Set(res.picked.flatMap(p=>p.days.map(d=>dateKey(d.date))));
+const resultDates=new Set(res.picked.flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>dateKey(d.date))));
 const summaryCards=[
   {label:'Feriedager', value:String(days)},
   {label:'Overføres', value:String(transferDays)},
