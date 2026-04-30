@@ -400,7 +400,10 @@ for(;;){
     const leverageScore=c.gained*1.25 - c.used*0.12;
     const baseValue=(leverageScore + longBlockBonus + holidayConnectionBonus + fullWeekBonus);
     const realismCost=partialPenalty+consecutivePenalty+clusteredPenalty+shortGapPenalty+unevenPenalty+isolatedPenalty;
-    const balancedScore=baseValue-realismCost;
+    const efficiencyModeScore=(c.gained*2.4)+(c.total*0.45)-(c.used*0.08)+(connectsToHolidayOrWeekend?0.8:0);
+    const realismModeScore=(baseValue*0.9)-realismCost;
+    const preferenceBlend=Math.min(Math.max(groupingPreference,0),1);
+    const balancedScore=(efficiencyModeScore*(1-preferenceBlend))+(realismModeScore*preferenceBlend);
     if(!best||balancedScore>best.balancedScore){
       best={period:c,balancedScore};
     }
