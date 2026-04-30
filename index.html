@@ -371,6 +371,26 @@ function plan(year,available){
     return periods.sort((a,b)=>a.start-b.start);
   }
 
+  function countPeriodsInRollingWindow(periods, windowDays){
+    const sorted=[...periods].sort((a,b)=>a.start-b.start);
+    let maxCount=0;
+    for(let i=0;i<sorted.length;i++){
+      const windowStart=sorted[i].start;
+      const windowEnd=addDays(windowStart,windowDays-1);
+      const count=sorted.filter(p=>p.start<=windowEnd && p.end>=windowStart).length;
+      if(count>maxCount) maxCount=count;
+    }
+    return maxCount;
+  }
+
+  function countMiniBreaksInMonth(periods, month){
+    return periods.filter(p=>{
+      const touchesMonth=p.start.getMonth()<=month && p.end.getMonth()>=month;
+      const isMiniBreak=p.used>0 && p.used<=3;
+      return touchesMonth && isMiniBreak;
+    }).length;
+  }
+
   function scorePlan(planPeriods,strategy){
     evaluatedPlans++;
     const used=planPeriods.reduce((s,p)=>s+p.used,0);
@@ -434,6 +454,18 @@ function plan(year,available){
     }
     let repeatedMiniBreakWindowPenalty=0;
     let extremeMiniBreakWindowPenalty=0;
+    const rolling45MaxPeriods=countPeriodsInRollingWindow(sorted,45);
+    const mayMiniBreakCount=countMiniBreaksInMonth(sorted,4);
+    const hasMainBlockInMay=sorted.some(p=>p.used>=5 && p.start.getMonth()<=4 && p.end.getMonth()>=4);
+    let clusteringPenalty=0;
+
+    if(rolling45MaxPeriods>3){
+      clusteringPenalty+=(rolling45MaxPeriods-3)*120;
+    }
+    if(mayMiniBreakCount>2 && !hasMainBlockInMay){
+      clusteringPenalty+=(mayMiniBreakCount-2)*160;
+    }
+
     for(let i=0;i<sorted.length;i++){
       const windowStart=sorted[i].start;
       const rolling45End=addDays(windowStart,44);
@@ -519,7 +551,9 @@ function plan(year,available){
     score-=repeatedMiniBreakWindowPenalty;
     score-=extremeMiniBreakWindowPenalty;
     score-=repeatedWorkRhythmPenalty;
-    return {score,used,free,eff,unused,fullWeeks,months,closeGapPenalty,repeatedPenalty,repeatedWorkRhythmPenalty,repeatedMiniBreakWindowPenalty,extremeMiniBreakWindowPenalty,closeGapTouched,closeGapReduced,clusterWindowPenalty,periodClusterPenalty,concentrationWindowPenalty,twoWeekMainHoliday,fullWeekCount,summerDays};
+    score-=clusteringPenalty;
+    const hardClusterViolation=(rolling45MaxPeriods>3) || (mayMiniBreakCount>2 && !hasMainBlockInMay);
+    return {score,used,free,eff,unused,fullWeeks,months,closeGapPenalty,repeatedPenalty,repeatedWorkRhythmPenalty,repeatedMiniBreakWindowPenalty,extremeMiniBreakWindowPenalty,closeGapTouched,closeGapReduced,clusterWindowPenalty,periodClusterPenalty,concentrationWindowPenalty,twoWeekMainHoliday,fullWeekCount,summerDays,rolling45MaxPeriods,mayMiniBreakCount,clusteringPenalty,hardClusterViolation};
   }
 
   const variants=['balanced','leverage','fullWeeks','spread','summerBridges','userPriority'].map(strategy=>{
@@ -528,7 +562,18 @@ function plan(year,available){
     return {strategy,periods,...scorePlan(periods,strategy)};
   });
   const validVariants=variants.filter(Boolean);
-  const bestOverall=[...validVariants].sort((a,b)=>b.score-a.score)[0];
+  const bestOverall=[...validVariants].sort((a,b)=>{
+    if(a.hardClusterViolation!==b.hardClusterViolation){
+      if(a.hardClusterViolation && !b.hardClusterViolation){
+        return (a.free-b.free)>=7 ? -1 : 1;
+      }
+      if(!a.hardClusterViolation && b.hardClusterViolation){
+        return (b.free-a.free)>=7 ? 1 : -1;
+      }
+    }
+    if((a.clusteringPenalty||0)!==(b.clusteringPenalty||0)) return (a.clusteringPenalty||0)-(b.clusteringPenalty||0);
+    return b.score-a.score;
+  })[0];
   const chosen=bestOverall;
 
   const picked=chosen.periods;
@@ -564,6 +609,42 @@ function plan(year,available){
     plannerDebug('chosen-candidates', picked.map(c=>({reason:c.reason,why:c.chosenWhy,used:c.used,total:c.total,eff:c.efficiency?.toFixed?.(2)})));
     plannerDebug('rejected-candidates', candidates.filter(c=>!picked.some(p=>p.id===c.id)).slice(0,20).map(c=>({reason:c.reason,used:c.used,eff:c.efficiency.toFixed(2),why:'overlap or capacity or lower score'})));
     plannerDebug('summary',{evaluatedPlans,totalEfficiency:(totalFree/Math.max(1,totalUsed)).toFixed(2),unusedDays:left,runtimeMs:Math.round(performance.now()-startedAt)});
+    plannerDebug('chosen-plan-periods', picked.map(p=>({
+      start:dateKey(p.start),
+      end:dateKey(p.end),
+      used:p.used,
+      free:p.total,
+      reason:p.reason
+    })));
+    plannerDebug('chosen-plan-clustering',{
+      rolling45MaxPeriods:chosen.rolling45MaxPeriods||0,
+      mayMiniBreakCount:chosen.mayMiniBreakCount||0,
+      clusteringPenalty:chosen.clusteringPenalty||0,
+      hardClusterViolation:Boolean(chosen.hardClusterViolation)
+    });
+    const rejectedTop5=[...validVariants]
+      .filter(v=>v.strategy!==chosen.strategy)
+      .sort((a,b)=>b.score-a.score)
+      .slice(0,5)
+      .map(v=>({
+        strategy:v.strategy,
+        score:Number(v.score.toFixed(2)),
+        rolling45MaxPeriods:v.rolling45MaxPeriods||0,
+        mayMiniBreakCount:v.mayMiniBreakCount||0,
+        clusteringPenalty:Number((v.clusteringPenalty||0).toFixed(2)),
+        hardClusterViolation:Boolean(v.hardClusterViolation),
+        lostBecause:
+          (v.hardClusterViolation&&!chosen.hardClusterViolation)?'hard cluster violation without 7+ free-day gain':
+          ((v.clusteringPenalty||0)>(chosen.clusteringPenalty||0))?'higher clustering penalty':
+          'lower total score'
+      }));
+    plannerDebug('rejected-alternatives-top5', rejectedTop5);
+    if((chosen.mayMiniBreakCount||0)>3){
+      console.warn('[PLANNER] Warning: chosen plan still has high May/early-June mini-break clustering.',{
+        mayMiniBreakCount:chosen.mayMiniBreakCount,
+        rolling45MaxPeriods:chosen.rolling45MaxPeriods
+      });
+    }
   }
 
   const highConcentrationWarning=(chosen.concentrationWindowPenalty||0)>0?'Planen fordeler ferien mer utover året for å unngå for stor konsentrasjon i én kort periode.':'';
