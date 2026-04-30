@@ -1,1 +1,96 @@
+<!DOCTYPE html>
+
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <title>Ferieplanlegger 🇳🇴</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    body {
+      font-family: -apple-system, sans-serif;
+      padding: 20px;
+      background: #f2f2f7;
+      color: #111;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    .card {
+      background: white;
+      padding: 16px;
+      border-radius: 14px;
+      margin-top: 15px;
+    }
+
+    input, button {
+      padding: 12px;
+      width: 100%;
+      margin-top: 8px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+
+    button {
+      background: black;
+      color: white;
+      border: none;
+    }
+
+    .result strong {
+      font-size: 18px;
+    }
+  </style>
+
+</head>
+<body>
+
+<h1>Ferieplanlegger 🇳🇴</h1>
+
+<div class="card">
+  <label>Antall feriedager</label>
+  <input id="days" type="number" value="10">
+
+<button onclick="calculate()">Finn beste ferie</button>
+
+</div>
+
+<div id="result" class="card result" style="display:none;"></div>
+
+<script>
+function calculate() {
+  const days = parseInt(document.getElementById("days").value);
+
+  if (!days || days <= 0) return;
+
+  // Simulert smart ferieutnyttelse
+  // Antar at du plasserer dagene rundt helger
+  const weekends = Math.floor(days * 2); // hver ferie gir ca 2 ekstra helgedager
+  const holidaysBonus = Math.floor(days * 0.3); // effekt av helligdager
+
+  const totalFree = days + weekends + holidaysBonus;
+  const gained = totalFree - days;
+
+  const result = document.getElementById("result");
+  result.style.display = "block";
+
+  result.innerHTML = `
+    <h2>Resultat</h2>
+    <p>Brukte feriedager: ${days}</p>
+    <p>Total sammenhengende fri: ${totalFree} dager</p>
+    <p><strong>Du har “tjent” ${gained} ekstra fridager 🎉</strong></p>
+
+    <hr style="margin:15px 0;">
+
+    <p>💡 Tips:</p>
+    <p>Legg ferie rundt helger og helligdager for maksimal effekt.</p>
+  `;
+}
+</script>
+
+</body>
+</html>
 
