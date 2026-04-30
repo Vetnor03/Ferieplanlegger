@@ -339,7 +339,7 @@ function renderCalendar(){
     if(isWeekend(d)) cls.push('weekend');
     if(holiday) cls.push(holiday.includes('spesialdag') ? 'special' : 'holiday');
     if(selectedDates.has(key)) cls.push('selected');
-    html += `<button type="button" class="${cls.join(' ')}" onclick="toggleDate('${key}')">${day}</button>`;
+    html += `<button type="button" class="${cls.join(' ')}" onclick="smartToggleDate('${key}')">${day}</button>`;
   }
   html += '</div>';
   root.innerHTML=html;
@@ -359,7 +359,36 @@ function removePreferredPeriod(startKey,endKey){
   renderCalendar();
   runPlanner();
 }
-function toggleDate(key){ if(selectedDates.has(key)) selectedDates.delete(key); else selectedDates.add(key); renderCalendar(); }
+
+function fillShortGaps(){
+  const sorted=[...selectedDates].map(k=>new Date(k)).sort((a,b)=>a-b);
+  let changed=false;
+  for(let i=1;i<sorted.length;i++){
+    const prev=sorted[i-1];
+    const cur=sorted[i];
+    const diff=(cur-prev)/(1000*60*60*24);
+    if(diff<=1||diff>3) continue;
+    for(let d=1;d<diff;d++){
+      const mid=addDays(prev,d);
+      const k=dateKey(mid);
+      if(!selectedDates.has(k)){
+        selectedDates.add(k);
+        changed=true;
+      }
+    }
+  }
+  return changed;
+}
+function smartToggleDate(key){
+  if(selectedDates.has(key)){
+    selectedDates.delete(key);
+    renderCalendar();
+    return;
+  }
+  selectedDates.add(key);
+  while(fillShortGaps()){}
+  renderCalendar();
+}
 function changePickerMonth(delta){ pickerMonth=(pickerMonth+delta+12)%12; renderCalendar(); }
 function selectWholeMonth(){ const year=Number(document.getElementById('year').value); const month=((pickerMonth%12)+12)%12; const last=new Date(year,month+1,0).getDate(); for(let i=1;i<=last;i++) selectedDates.add(dateKey(new Date(year,month,i))); renderCalendar(); }
 function clearSelectedDays(){ selectedDates.clear(); renderCalendar(); }
