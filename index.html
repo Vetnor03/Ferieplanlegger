@@ -253,6 +253,13 @@ function evaluatePeriod(start,end,map,reason){let used=0,total=0;const days=[];f
 return {start,end,used,total,gained:total-used,score:total/Math.max(used,1),days,reason};}
 
 function selectedDatesToPeriods(year,map){const list=[...selectedDates].map(k=>new Date(k)).filter(d=>d.getFullYear()===year).sort((a,b)=>a-b);if(!list.length) return [];const periods=[];let start=list[0], prev=list[0];for(let i=1;i<list.length;i++){if((list[i]-prev)/(1000*60*60*24)===1){ prev=list[i]; continue; }periods.push(evaluatePeriod(start,prev,map,'Valgt i kalender'));start=list[i]; prev=list[i];}periods.push(evaluatePeriod(start,prev,map,'Valgt i kalender'));return periods;}
+function seasonForDate(d){
+  const m=d.getMonth();
+  if(m>=2&&m<=4) return 'spring';
+  if(m>=5&&m<=7) return 'summer';
+  if(m>=8&&m<=10) return 'autumn';
+  return 'winter';
+}
 function writeSelectedToTextarea(){document.getElementById('selectedCount').textContent=`${selectedDates.size} dager valgt`;}
 function parsePreferred(year,map){return {periods:selectedDatesToPeriods(year,map),errors:[]};}
 function overlaps(p,set){return p.days.some(d=>set.has(dateKey(d.date)));}
@@ -404,6 +411,11 @@ function plan(year,available){
     const partial=planPeriods.filter(p=>!p.clean).length;
     const unused=Math.max(0,available-used);
     const sorted=[...planPeriods].sort((a,b)=>a.start-b.start);
+    const vacationDays=sorted.flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>d.date));
+    const seasonBuckets={spring:0,summer:0,autumn:0,winter:0};
+    vacationDays.forEach(d=>{ seasonBuckets[seasonForDate(d)]++; });
+    const usedSeasons=Object.values(seasonBuckets).filter(v=>v>0).length;
+    const dominantSeasonShare=(used>0?Math.max(...Object.values(seasonBuckets))/used:0);
     const summerStart=new Date(year,5,1);
     const summerEnd=new Date(year,7,31);
     const isCustomSeason=season.value==='custom';
@@ -500,6 +512,15 @@ function plan(year,available){
     if(shortWorkGapTransitions>=3){
       repeatedWorkRhythmPenalty += (shortWorkGapTransitions-2)*(strategy==='spread'?12:10);
     }
+    let staccatoPatternPenalty=0;
+    for(let i=0;i<=gapSequence.length-2;i++){
+      if(gapSequence[i]===2 && gapSequence[i+1]===2) staccatoPatternPenalty+=26;
+    }
+    if(gapSequence.length>=3){
+      for(let i=0;i<=gapSequence.length-3;i++){
+        if(gapSequence[i]===2 && gapSequence[i+1]===2 && gapSequence[i+2]===2) staccatoPatternPenalty+=44;
+      }
+    }
     const repeatedPenalty=repeatedCloseTransitions*(strategy==='spread'?12:(strategy==='fullWeeks'?10:11));
     const breakCount=sorted.length;
     const concentrationPenalty=Math.max(0, largest - Math.round(Math.max(used,1)*0.65))*2;
@@ -544,6 +565,19 @@ function plan(year,available){
       else score-=45;
     }
     if(available>=20 && summerDays<5 && !isCustomSeason) score-=28;
+    if(usedSeasons>=3) score+=28;
+    if(usedSeasons===4) score+=70;
+    if(dominantSeasonShare>0.5) score-=(dominantSeasonShare-0.5)*280;
+    if(dominantSeasonShare>0.65) score-=120+(dominantSeasonShare-0.65)*420;
+
+    if(available>=20){
+      const autumnStart=new Date(year,8,1), autumnEnd=new Date(year,10,30);
+      const hasAutumnWeek=sorted.some(p=>p.used>=5 && p.start<=autumnEnd && p.end>=autumnStart);
+      const hasAutumnLongWeekend=sorted.some(p=>p.used>=2 && p.total>=4 && p.start<=autumnEnd && p.end>=autumnStart);
+      if(hasAutumnWeek) score+=40;
+      else if(hasAutumnLongWeekend) score+=20;
+      else score-=170;
+    }
     score-=closeGapPenalty;
     score-=repeatedPenalty;
     score-=clusterWindowPenalty;
@@ -552,9 +586,10 @@ function plan(year,available){
     score-=repeatedMiniBreakWindowPenalty;
     score-=extremeMiniBreakWindowPenalty;
     score-=repeatedWorkRhythmPenalty;
+    score-=staccatoPatternPenalty;
     score-=clusteringPenalty;
-    const hardClusterViolation=(rolling45MaxPeriods>3) || (mayMiniBreakCount>2 && !hasMainBlockInMay);
-    return {score,used,free,eff,unused,fullWeeks,months,closeGapPenalty,repeatedPenalty,repeatedWorkRhythmPenalty,repeatedMiniBreakWindowPenalty,extremeMiniBreakWindowPenalty,closeGapTouched,closeGapReduced,clusterWindowPenalty,periodClusterPenalty,concentrationWindowPenalty,twoWeekMainHoliday,fullWeekCount,summerDays,rolling45MaxPeriods,mayMiniBreakCount,clusteringPenalty,hardClusterViolation};
+    const hardClusterViolation=(rolling45MaxPeriods>4) || (mayMiniBreakCount>3);
+    return {score,used,free,eff,unused,fullWeeks,months,closeGapPenalty,repeatedPenalty,repeatedWorkRhythmPenalty,repeatedMiniBreakWindowPenalty,extremeMiniBreakWindowPenalty,closeGapTouched,closeGapReduced,clusterWindowPenalty,periodClusterPenalty,concentrationWindowPenalty,twoWeekMainHoliday,fullWeekCount,summerDays,rolling45MaxPeriods,mayMiniBreakCount,clusteringPenalty,hardClusterViolation,seasonBuckets,usedSeasons,dominantSeasonShare,staccatoPatternPenalty};
   }
 
   const variants=['balanced','leverage','fullWeeks','spread','summerBridges','userPriority'].map(strategy=>{
@@ -566,13 +601,17 @@ function plan(year,available){
   const bestOverall=[...validVariants].sort((a,b)=>{
     if(a.hardClusterViolation!==b.hardClusterViolation){
       if(a.hardClusterViolation && !b.hardClusterViolation){
-        return (a.free-b.free)>=7 ? -1 : 1;
+        return (a.free-b.free)>=6 ? -1 : 1;
       }
       if(!a.hardClusterViolation && b.hardClusterViolation){
-        return (b.free-a.free)>=7 ? 1 : -1;
+        return (b.free-a.free)>=6 ? 1 : -1;
       }
     }
     if((a.clusteringPenalty||0)!==(b.clusteringPenalty||0)) return (a.clusteringPenalty||0)-(b.clusteringPenalty||0);
+    if(Math.abs(b.score-a.score)<=8){
+      if((b.usedSeasons||0)!==(a.usedSeasons||0)) return (b.usedSeasons||0)-(a.usedSeasons||0);
+      if((a.dominantSeasonShare||0)!==(b.dominantSeasonShare||0)) return (a.dominantSeasonShare||0)-(b.dominantSeasonShare||0);
+    }
     return b.score-a.score;
   })[0];
   const chosen=bestOverall;
@@ -652,6 +691,17 @@ function plan(year,available){
   return {picked,left,totalUsed,totalFree,totalGained:totalFree-totalUsed,eff:totalFree/Math.max(totalUsed,1),holidays,errors:preferred.errors,metrics:{fullCount:picked.filter(p=>p.used>=5).length,partialCount:Math.max(0,picked.filter(p=>!p.clean).length),closeGapPenalty:chosen.closeGapPenalty||0,repeatedPenalty:chosen.repeatedPenalty||0,repeatedWorkRhythmPenalty:chosen.repeatedWorkRhythmPenalty||0,repeatedMiniBreakWindowPenalty:chosen.repeatedMiniBreakWindowPenalty||0,extremeMiniBreakWindowPenalty:chosen.extremeMiniBreakWindowPenalty||0,mainHoliday:chosen.twoWeekMainHoliday||false},explanation,leftoverExplanation:left>0?`${left} dag(er) ble stående igjen fordi de ikke forbedret totalplanen uten å gjøre planen mindre ryddig.`:'Alle tilgjengelige feriedager ble brukt.',qualityLabel:strategyLabels[chosen.strategy]||'Anbefalt ferieplan',highConcentrationWarning,fallbackNote};
 }
 const formatDate=d=>`${d.getDate()}. ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+function decorateVacationContinuity(baseVacationDates){
+  const out=new Set(baseVacationDates);
+  baseVacationDates.forEach(key=>{
+    const d=new Date(key);
+    [-2,-1,1,2].forEach(delta=>{
+      const n=addDays(d,delta);
+      if(isWeekend(n)) out.add(dateKey(n));
+    });
+  });
+  return out;
+}
 async function runPlanner(){const year=Number(document.getElementById('year').value),days=Number(document.getElementById('days').value),transferDays=Number(document.getElementById('transferDays').value||0),out=document.getElementById('result');
 const button=document.querySelector('button[onclick="runPlanner()"]');
 const overlay=document.getElementById('loadingOverlay');
@@ -720,7 +770,8 @@ if(res.picked.length===0){
 }
 const durationMs=Math.round(performance.now()-startedAt);
 loadingDebug(`planner finished in ${durationMs} ms`);
-const resultDates=new Set(res.picked.flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>dateKey(d.date))));
+const paidVacationDates=new Set(res.picked.flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>dateKey(d.date))));
+const resultDates=decorateVacationContinuity(paidVacationDates);
 const summaryCards=[
   {label:'Feriedager', value:String(days)},
   {label:'Overføres', value:String(transferDays)},
