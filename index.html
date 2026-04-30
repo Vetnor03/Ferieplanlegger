@@ -16,6 +16,7 @@
       --holiday: #ddd6fe;
       --special: #fecaca;
       --border: #e5e7eb;
+      --selected: #86efac;
     }
     * { box-sizing: border-box; }
     body {
@@ -25,7 +26,7 @@
       background: var(--bg);
     }
     .app {
-      max-width: 860px;
+      max-width: 980px;
       margin: 0 auto;
       padding: 16px 14px calc(120px + env(safe-area-inset-bottom));
     }
@@ -43,9 +44,7 @@
     .grid { display: grid; gap: 10px; }
     label { font-weight: 700; font-size: 0.95rem; margin-bottom: 6px; display: block; }
     .help { color: var(--muted); font-size: 0.82rem; margin-top: -2px; margin-bottom: 8px; }
-    input, select, textarea, button {
-      width: 100%; font: inherit; padding: 12px; border-radius: 12px; border: 1px solid #d1d5db;
-    }
+    input, select, textarea, button { width: 100%; font: inherit; padding: 12px; border-radius: 12px; border: 1px solid #d1d5db; }
     textarea { min-height: 90px; resize: vertical; }
     button { background: var(--accent); color: white; border: none; font-weight: 700; }
     .inline { display: flex; align-items: start; gap: 10px; }
@@ -64,6 +63,28 @@
     .legend { display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.8rem; color: var(--muted); }
     .holiday-row { display:flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
     .muted { color: var(--muted); font-size: 0.9rem; }
+    .calendar-header { display:flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .calendar-grid { display:grid; grid-template-columns: repeat(7,1fr); gap:4px; }
+    .calendar-day {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 4px;
+      text-align: center;
+      background: white;
+      cursor: pointer;
+      min-height: 44px;
+      font-size: 0.8rem;
+    }
+    .calendar-day.empty { visibility: hidden; cursor: default; }
+    .calendar-day.weekend { background: #f3f4f6; }
+    .calendar-day.holiday { background: #ede9fe; }
+    .calendar-day.special { background: #fee2e2; }
+    .calendar-day.selected { outline: 2px solid #16a34a; background: var(--selected); }
+    .calendar-day small { display:block; color: var(--muted); font-size:0.7rem; }
+    .weekday-head { text-align:center; color: var(--muted); font-size:0.75rem; margin-bottom:4px; }
+    .calendar-actions { display:flex; gap:8px; flex-wrap: wrap; }
+    .calendar-actions button { width:auto; padding:8px 12px; border-radius:10px; }
+    .calendar-actions .ghost { background:#fff; color:var(--text); border:1px solid var(--border); }
     @media (min-width: 740px) {
       .app { padding: 24px 20px calc(36px + env(safe-area-inset-bottom)); }
       .summary { grid-template-columns: repeat(3, 1fr); }
@@ -108,9 +129,21 @@
 
       <div>
         <label for="preferred">Foretrukne ferieperioder (valgfritt)</label>
-        <p class="help">Én per linje, format: YYYY-MM-DD to YYYY-MM-DD</p>
+        <p class="help">Klikk i kalenderen under for å markere dager. Tekstfeltet fylles automatisk, men kan også redigeres manuelt.</p>
         <textarea id="preferred" placeholder="2026-07-06 to 2026-07-17\n2026-12-24 to 2026-12-31"></textarea>
       </div>
+
+      <section class="card" style="margin:0;">
+        <div class="calendar-header">
+          <h2 style="margin:0;">Velg ferie i kalender</h2>
+          <span id="selectedCount" class="muted">0 dager valgt</span>
+        </div>
+        <div class="calendar-actions">
+          <button class="ghost" type="button" onclick="selectWholeMonth()">Velg hele måneden</button>
+          <button class="ghost" type="button" onclick="clearSelectedDays()">Fjern markering</button>
+        </div>
+        <div id="calendar" style="margin-top:10px;"></div>
+      </section>
 
       <label class="inline"><input id="includeSpecial" type="checkbox" checked />
         <span>Regn julaften (24.12) og nyttårsaften (31.12) som nyttige spesialdager</span>
@@ -127,13 +160,40 @@ const dayNames=["søn","man","tir","ons","tor","fre","lør"]; const monthNames=[
 const yearSel=document.getElementById('year'); const nowY=new Date().getFullYear(); for(let y=nowY;y<=nowY+3;y++){yearSel.add(new Option(String(y),String(y)));}
 const season=document.getElementById('season'); season.addEventListener('change',()=>document.getElementById('customRange').style.display=season.value==='custom'?'grid':'none');
 const dateKey=d=>d.toISOString().slice(0,10); const addDays=(d,n)=>{const x=new Date(d); x.setDate(x.getDate()+n); return x;}; const isWeekend=d=>d.getDay()===0||d.getDay()===6;
+const selectedDates = new Set();
+
 function easterSunday(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return new Date(y,mo-1,da);}
 function holidaysNO(year, includeSpecial){const e=easterSunday(year);const holidays=[{date:new Date(year,0,1),name:'Nyttårsdag'},{date:addDays(e,-3),name:'Skjærtorsdag'},{date:addDays(e,-2),name:'Langfredag'},{date:addDays(e,0),name:'1. påskedag'},{date:addDays(e,1),name:'2. påskedag'},{date:new Date(year,4,1),name:'Arbeidernes dag'},{date:new Date(year,4,17),name:'Grunnlovsdag (17. mai)'},{date:addDays(e,39),name:'Kristi himmelfartsdag'},{date:addDays(e,49),name:'1. pinsedag'},{date:addDays(e,50),name:'2. pinsedag'},{date:new Date(year,11,25),name:'1. juledag'},{date:new Date(year,11,26),name:'2. juledag'}];
 if(includeSpecial){holidays.push({date:new Date(year,11,24),name:'Julaften (spesialdag)'},{date:new Date(year,11,31),name:'Nyttårsaften (spesialdag)'});} const map={};holidays.forEach(h=>map[dateKey(h.date)]=h.name); return {holidays,map};}
 function inFilter(d, year){const s=season.value; if(s==='all') return d.getFullYear()===year; if(s==='spring') return d>=new Date(year,2,1)&&d<=new Date(year,4,31); if(s==='summer') return d>=new Date(year,5,1)&&d<=new Date(year,7,31); if(s==='autumn') return d>=new Date(year,8,1)&&d<=new Date(year,10,30); if(s==='xmas') return d>=new Date(year,11,15)&&d<=new Date(year+1,0,10); if(s==='custom'){const a=new Date(document.getElementById('customStart').value); const b=new Date(document.getElementById('customEnd').value); if(isNaN(a)||isNaN(b)) return false; return d>=a&&d<=b;} return true;}
 function evaluatePeriod(start,end,map,reason){let used=0,total=0;const days=[];for(let d=new Date(start);d<=end;d=addDays(d,1)){const k=dateKey(d),h=map[k],w=isWeekend(d); total++; let type='vacation',label='Ferie'; if(h){type=h.includes('spesialdag')?'special':'holiday';label=h;} else if(w){type='weekend';label='Helg';} else used++; days.push({date:new Date(d),type,label});}
 return {start,end,used,total,gained:total-used,score:total/Math.max(used,1),days,reason};}
-function parsePreferred(year,map){const txt=document.getElementById('preferred').value.trim(); if(!txt) return {periods:[],errors:[]}; const errors=[],periods=[]; txt.split(/\n+/).forEach((line,i)=>{const m=line.trim().match(/(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/i); if(!m){errors.push(`Linje ${i+1} har feil format.`); return;} const a=new Date(m[1]),b=new Date(m[2]); if(isNaN(a)||isNaN(b)||a>b){errors.push(`Linje ${i+1} har ugyldig datointervall.`); return;} periods.push(evaluatePeriod(a,b,map,'Din ønskede periode'));}); periods.sort((a,b)=>a.start-b.start); return {periods,errors};}
+
+function selectedDatesToPeriods(year,map){
+  const list=[...selectedDates].map(k=>new Date(k)).filter(d=>d.getFullYear()===year).sort((a,b)=>a-b);
+  if(!list.length) return [];
+  const periods=[];
+  let start=list[0], prev=list[0];
+  for(let i=1;i<list.length;i++){
+    if((list[i]-prev)/(1000*60*60*24)===1){ prev=list[i]; continue; }
+    periods.push(evaluatePeriod(start,prev,map,'Valgt i kalender'));
+    start=list[i]; prev=list[i];
+  }
+  periods.push(evaluatePeriod(start,prev,map,'Valgt i kalender'));
+  return periods;
+}
+function writeSelectedToTextarea(){
+  const year=Number(document.getElementById('year').value);
+  const {map}=holidaysNO(year,document.getElementById('includeSpecial').checked);
+  const text=selectedDatesToPeriods(year,map).map(p=>`${dateKey(p.start)} to ${dateKey(p.end)}`).join('\n');
+  document.getElementById('preferred').value=text;
+  document.getElementById('selectedCount').textContent=`${selectedDates.size} dager valgt`;
+}
+function parsePreferred(year,map){
+const txt=document.getElementById('preferred').value.trim();
+if(!txt) return {periods:selectedDatesToPeriods(year,map),errors:[]};
+const errors=[],periods=[];
+txt.split(/\n+/).forEach((line,i)=>{const m=line.trim().match(/(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/i); if(!m){errors.push(`Linje ${i+1} har feil format.`); return;} const a=new Date(m[1]),b=new Date(m[2]); if(isNaN(a)||isNaN(b)||a>b){errors.push(`Linje ${i+1} har ugyldig datointervall.`); return;} periods.push(evaluatePeriod(a,b,map,'Din ønskede periode'));}); periods.sort((a,b)=>a.start-b.start); return {periods,errors};}
 function overlaps(p,set){return p.days.some(d=>set.has(dateKey(d.date)));}
 function plan(year,available){const includeSpecial=document.getElementById('includeSpecial').checked; const {holidays,map}=holidaysNO(year,includeSpecial); const usedDates=new Set(); const picked=[];
 const preferred=parsePreferred(year,map); let used=0;
@@ -157,6 +217,41 @@ ${res.errors.length?`<p class="muted">Merknad: ${res.errors.join(' ')}</p>`:''}
 ${res.picked.map((p,i)=>`<section class="card period"><h2>${i+1}. ${formatDate(p.start)} – ${formatDate(p.end)}</h2><span class="reason">${p.reason}</span><p class="muted">${p.used} feriedager brukt • ${p.total} dager fri • ${p.gained} ekstra dager</p><div class="timeline">${p.days.map(d=>`<span class="pill ${d.type}">${dayNames[d.date.getDay()]} ${d.date.getDate()}. ${monthNames[d.date.getMonth()]}</span>`).join('')}</div></section>`).join('')}
 <section class="card"><h2>Norske helligdager ${year}</h2>${res.holidays.sort((a,b)=>a.date-b.date).map(h=>`<div class="holiday-row"><strong>${formatDate(h.date)}</strong><span>${h.name}</span></div>`).join('')}</section>`;
 }
+
+function renderCalendar(){
+  const year=Number(document.getElementById('year').value);
+  const includeSpecial=document.getElementById('includeSpecial').checked;
+  const {map}=holidaysNO(year,includeSpecial);
+  const root=document.getElementById('calendar');
+  let html='';
+  for(let month=0;month<12;month++){
+    const first=new Date(year,month,1);
+    const last=new Date(year,month+1,0);
+    const offset=(first.getDay()+6)%7;
+    html += `<section class="card" style="margin-bottom:8px;"><h3 style="margin:0 0 8px;">${monthNames[month]} ${year}</h3>`;
+    html += '<div class="calendar-grid">'+['man','tir','ons','tor','fre','lør','søn'].map(d=>`<div class="weekday-head">${d}</div>`).join('')+'</div>';
+    html += '<div class="calendar-grid">';
+    for(let i=0;i<offset;i++) html += '<div class="calendar-day empty"></div>';
+    for(let day=1;day<=last.getDate();day++){
+      const d=new Date(year,month,day); const key=dateKey(d); const holiday=map[key];
+      const cls=['calendar-day'];
+      if(isWeekend(d)) cls.push('weekend');
+      if(holiday) cls.push(holiday.includes('spesialdag') ? 'special' : 'holiday');
+      if(selectedDates.has(key)) cls.push('selected');
+      html += `<button type="button" class="${cls.join(' ')}" onclick="toggleDate('${key}')">${day}${holiday?`<small>${holiday.split(' ')[0]}</small>`:''}</button>`;
+    }
+    html += '</div></section>';
+  }
+  root.innerHTML=html;
+  writeSelectedToTextarea();
+}
+function toggleDate(key){ if(selectedDates.has(key)) selectedDates.delete(key); else selectedDates.add(key); renderCalendar(); }
+function selectWholeMonth(){ const year=Number(document.getElementById('year').value); const month=new Date().getMonth(); const last=new Date(year,month+1,0).getDate(); for(let i=1;i<=last;i++) selectedDates.add(dateKey(new Date(year,month,i))); renderCalendar(); }
+function clearSelectedDays(){ selectedDates.clear(); renderCalendar(); }
+
+yearSel.addEventListener('change',()=>{clearSelectedDays(); renderCalendar(); runPlanner();});
+document.getElementById('includeSpecial').addEventListener('change',()=>{renderCalendar(); runPlanner();});
+renderCalendar();
 runPlanner();
 </script>
 </body>
