@@ -92,6 +92,7 @@
     .calendar-day.special { background: var(--special); color: var(--special-strong); }
     .calendar-day.selected { outline: 2px solid #16a34a; outline-offset: -2px; }
     .calendar-day.selected:not(.weekend):not(.holiday):not(.special) { background: var(--selected); color: var(--vac-strong); }
+    .calendar-day.weekend.continuity { background: var(--selected); color: var(--vac-strong); }
     .calendar-day small { display:block; color: var(--muted); font-size:0.7rem; }
     .weekday-head { text-align:center; color: var(--muted); font-size:0.75rem; margin-bottom:4px; }
     .calendar-actions { display:flex; gap:8px; flex-wrap: wrap; }
@@ -260,6 +261,26 @@ function seasonForDate(d){
   if(m>=8&&m<=10) return 'autumn';
   return 'winter';
 }
+function hasTwoConsecutiveSummerWeeksFromVacationDates(vacationDates, year){
+  if(!vacationDates.length) return false;
+  const summerStart=new Date(year,5,1);
+  const summerEnd=new Date(year,7,31);
+  const summerSet=new Set(
+    vacationDates.filter(d=>d>=summerStart && d<=summerEnd).map(dateKey)
+  );
+  if(summerSet.size<10) return false;
+  for(let d=new Date(summerStart); d<=summerEnd; d=addDays(d,1)){
+    let run=0;
+    for(let i=0;i<14;i++){
+      const check=addDays(d,i);
+      if(check>summerEnd) break;
+      if(summerSet.has(dateKey(check))) run++;
+      else run=0;
+      if(run>=14) return true;
+    }
+  }
+  return false;
+}
 function writeSelectedToTextarea(){document.getElementById('selectedCount').textContent=`${selectedDates.size} dager valgt`;}
 function parsePreferred(year,map){return {periods:selectedDatesToPeriods(year,map),errors:[]};}
 function overlaps(p,set){return p.days.some(d=>set.has(dateKey(d.date)));}
@@ -421,7 +442,7 @@ function plan(year,available){
     const isCustomSeason=season.value==='custom';
     const summerDays=sorted.reduce((sum,p)=>sum+p.days.filter(d=>d.type==='vacation' && d.date>=summerStart && d.date<=summerEnd).length,0);
     const summerFullWeeks=sorted.filter(p=>p.used>=5 && p.start<=summerEnd && p.end>=summerStart).length;
-    const twoWeekMainHoliday=sorted.some(p=>p.used>=10 && p.start<=summerEnd && p.end>=summerStart);
+    const twoWeekMainHoliday=hasTwoConsecutiveSummerWeeksFromVacationDates(vacationDays, year);
     const fullWeekCount=sorted.filter(p=>p.used>=5).length;
     let closeGapPenalty=0;
     let repeatedCloseTransitions=0;
@@ -556,9 +577,9 @@ function plan(year,available){
     if(strategy==='leverage' && redLeverage<3) score-=22;
     if(strategy==='userPriority' && selectedPeriods.length>0 && !planPeriods.some(p=>p.chosenWhy==='selected')) score-=45;
     if(available>=20 && !isCustomSeason){
-      if(twoWeekMainHoliday) score+=45;
-      else if(summerFullWeeks>=1) score+=20;
-      else score-=65;
+      if(twoWeekMainHoliday) score+=65;
+      else if(summerFullWeeks>=1) score+=18;
+      else score-=95;
     }
     if(available>=20){
       if(fullWeekCount>=2 || twoWeekMainHoliday) score+=30;
@@ -574,9 +595,24 @@ function plan(year,available){
       const autumnStart=new Date(year,8,1), autumnEnd=new Date(year,10,30);
       const hasAutumnWeek=sorted.some(p=>p.used>=5 && p.start<=autumnEnd && p.end>=autumnStart);
       const hasAutumnLongWeekend=sorted.some(p=>p.used>=2 && p.total>=4 && p.start<=autumnEnd && p.end>=autumnStart);
-      if(hasAutumnWeek) score+=40;
-      else if(hasAutumnLongWeekend) score+=20;
-      else score-=170;
+      if(hasAutumnWeek) score+=56;
+      else if(hasAutumnLongWeekend) score+=28;
+      else score-=220;
+    }
+    if(available>=20){
+      const julyStart=new Date(year,6,1);
+      const usedBeforeJuly=vacationDays.filter(d=>d<julyStart).length;
+      const earlyShare=usedBeforeJuly/Math.max(1,used);
+      if(earlyShare>0.65) score-=180+(earlyShare-0.65)*260;
+      else if(earlyShare>0.5) score-=75+(earlyShare-0.5)*180;
+    }
+    if(available>=20){
+      const seasonalPresenceCount=['spring','summer','autumn'].filter(s=>seasonBuckets[s]>0).length;
+      if(seasonalPresenceCount===3) score+=80;
+      else if(seasonalPresenceCount===2) score+=20;
+      else score-=130;
+      if(seasonBuckets.spring>0 && seasonBuckets.summer>0 && seasonBuckets.autumn>0) score+=40;
+      if(seasonBuckets.winter>0) score+=10;
     }
     score-=closeGapPenalty;
     score-=repeatedPenalty;
@@ -608,9 +644,13 @@ function plan(year,available){
       }
     }
     if((a.clusteringPenalty||0)!==(b.clusteringPenalty||0)) return (a.clusteringPenalty||0)-(b.clusteringPenalty||0);
-    if(Math.abs(b.score-a.score)<=8){
+    const scoreDiff=Math.abs(b.score-a.score);
+    const withinFivePct=scoreDiff<=Math.max(8,Math.abs(a.score)*0.05,Math.abs(b.score)*0.05);
+    if(withinFivePct){
+      if(Boolean(b.twoWeekMainHoliday)!==Boolean(a.twoWeekMainHoliday)) return Number(Boolean(b.twoWeekMainHoliday))-Number(Boolean(a.twoWeekMainHoliday));
       if((b.usedSeasons||0)!==(a.usedSeasons||0)) return (b.usedSeasons||0)-(a.usedSeasons||0);
       if((a.dominantSeasonShare||0)!==(b.dominantSeasonShare||0)) return (a.dominantSeasonShare||0)-(b.dominantSeasonShare||0);
+      if((a.rolling45MaxPeriods||0)!==(b.rolling45MaxPeriods||0)) return (a.rolling45MaxPeriods||0)-(b.rolling45MaxPeriods||0);
     }
     return b.score-a.score;
   })[0];
@@ -693,13 +733,30 @@ function plan(year,available){
 const formatDate=d=>`${d.getDate()}. ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
 function decorateVacationContinuity(baseVacationDates){
   const out=new Set(baseVacationDates);
-  baseVacationDates.forEach(key=>{
+  const vacationSet=new Set(baseVacationDates);
+  for(const key of vacationSet){
     const d=new Date(key);
-    [-2,-1,1,2].forEach(delta=>{
-      const n=addDays(d,delta);
-      if(isWeekend(n)) out.add(dateKey(n));
-    });
-  });
+    if(d.getDay()!==5) continue;
+    const sat=addDays(d,1);
+    const sun=addDays(d,2);
+    if(sat.getDay()===6) out.add(dateKey(sat));
+    if(sun.getDay()===0) out.add(dateKey(sun));
+  }
+  for(const key of vacationSet){
+    const d=new Date(key);
+    if(d.getDay()!==1) continue;
+    const sun=addDays(d,-1);
+    const sat=addDays(d,-2);
+    if(sat.getDay()===6) out.add(dateKey(sat));
+    if(sun.getDay()===0) out.add(dateKey(sun));
+  }
+  for(const key of vacationSet){
+    const d=new Date(key);
+    if(!isWeekend(d)) continue;
+    const prev=addDays(d,-1);
+    const next=addDays(d,1);
+    if(vacationSet.has(dateKey(prev)) || vacationSet.has(dateKey(next))) out.add(key);
+  }
   return out;
 }
 async function runPlanner(){const year=Number(document.getElementById('year').value),days=Number(document.getElementById('days').value),transferDays=Number(document.getElementById('transferDays').value||0),out=document.getElementById('result');
@@ -815,9 +872,11 @@ function renderResultCalendar(year, resultDates){
     for(let day=1;day<=last.getDate();day++){
       const d=new Date(year,month,day); const key=dateKey(d); const holiday=map[key];
       const cls=['calendar-day'];
-      if(isWeekend(d)) cls.push('weekend');
+      const isWeekendDay=isWeekend(d);
+      if(isWeekendDay) cls.push('weekend');
       if(holiday) cls.push(holiday.includes('spesialdag') ? 'special' : 'holiday');
       if(resultDates.has(key)) cls.push('selected');
+      if(isWeekendDay && resultDates.has(key)) cls.push('continuity');
       body += `<div class="${cls.join(' ')}">${day}</div>`;
     }
     body+='</div>';
