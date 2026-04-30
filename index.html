@@ -383,6 +383,13 @@ function plan(year,available){
     const partial=planPeriods.filter(p=>!p.clean).length;
     const unused=Math.max(0,available-used);
     const sorted=[...planPeriods].sort((a,b)=>a.start-b.start);
+    const summerStart=new Date(year,5,1);
+    const summerEnd=new Date(year,7,31);
+    const isCustomSeason=season.value==='custom';
+    const summerDays=sorted.reduce((sum,p)=>sum+p.days.filter(d=>d.type==='vacation' && d.date>=summerStart && d.date<=summerEnd).length,0);
+    const summerFullWeeks=sorted.filter(p=>p.used>=5 && p.start<=summerEnd && p.end>=summerStart).length;
+    const twoWeekMainHoliday=sorted.some(p=>p.used>=10 && p.start<=summerEnd && p.end>=summerStart);
+    const fullWeekCount=sorted.filter(p=>p.used>=5).length;
     let closeGapPenalty=0;
     let repeatedCloseTransitions=0;
     let prevClose=false;
@@ -420,10 +427,28 @@ function plan(year,available){
         });
       }
     }
-    const repeatedPenalty=repeatedCloseTransitions*(strategy==='spread'?7:(strategy==='fullWeeks'?4:6));
+    const repeatedPenalty=repeatedCloseTransitions*(strategy==='spread'?12:(strategy==='fullWeeks'?10:11));
     const breakCount=sorted.length;
     const concentrationPenalty=Math.max(0, largest - Math.round(Math.max(used,1)*0.65))*2;
     const mainHolidayQuality=Math.max(0,Math.min(40,largest*1.4));
+    let clusterWindowPenalty=0;
+    let periodClusterPenalty=0;
+    let concentrationWindowPenalty=0;
+    for(let i=0;i<sorted.length;i++){
+      const windowStart=sorted[i].start;
+      const sixtyDayEnd=addDays(windowStart,59);
+      const fiftySixDayEnd=addDays(windowStart,55);
+      const daysIn60=sorted.reduce((sum,p)=>sum+p.days.filter(d=>d.type==='vacation' && d.date>=windowStart && d.date<=sixtyDayEnd).length,0);
+      const periodsIn56=sorted.filter(p=>p.start<=fiftySixDayEnd && p.end>=windowStart).length;
+      const ratio=daysIn60/Math.max(1,used);
+      if(ratio>0.55) concentrationWindowPenalty+=Math.round((ratio-0.55)*100)*2.4;
+      else if(ratio>0.45) concentrationWindowPenalty+=Math.round((ratio-0.45)*100)*1.2;
+      if(periodsIn56>4) periodClusterPenalty+=(periodsIn56-4)*13;
+      if(periodsIn56>2){
+        const nonExceptional=sorted.filter(p=>p.start<=fiftySixDayEnd && p.end>=windowStart && p.efficiency<2.8).length;
+        if(nonExceptional>2) clusterWindowPenalty+=(nonExceptional-2)*9;
+      }
+    }
     const spreadBonus=months*6;
     const breakPenalty=breakCount>6?(breakCount-6)*8:0;
     const weights={eff:10,lever:7,full:6};
@@ -436,9 +461,22 @@ function plan(year,available){
     if(strategy==='summerBridges' && !planPeriods.some(p=>p.type==='summerBlock')) score-=35;
     if(strategy==='leverage' && redLeverage<3) score-=22;
     if(strategy==='userPriority' && selectedPeriods.length>0 && !planPeriods.some(p=>p.chosenWhy==='selected')) score-=45;
+    if(available>=20 && !isCustomSeason){
+      if(twoWeekMainHoliday) score+=45;
+      else if(summerFullWeeks>=1) score+=20;
+      else score-=65;
+    }
+    if(available>=20){
+      if(fullWeekCount>=2 || twoWeekMainHoliday) score+=30;
+      else score-=45;
+    }
+    if(available>=20 && summerDays<5 && !isCustomSeason) score-=28;
     score-=closeGapPenalty;
     score-=repeatedPenalty;
-    return {score,used,free,eff,unused,fullWeeks,months,closeGapPenalty,repeatedPenalty,closeGapTouched,closeGapReduced};
+    score-=clusterWindowPenalty;
+    score-=periodClusterPenalty;
+    score-=concentrationWindowPenalty;
+    return {score,used,free,eff,unused,fullWeeks,months,closeGapPenalty,repeatedPenalty,closeGapTouched,closeGapReduced,clusterWindowPenalty,periodClusterPenalty,concentrationWindowPenalty,twoWeekMainHoliday,fullWeekCount,summerDays};
   }
 
   const variants=['balanced','leverage','fullWeeks','spread','summerBridges','userPriority'].map(strategy=>{
@@ -464,7 +502,13 @@ function plan(year,available){
   };
   const baseExplanation='Vi sammenlignet flere komplette ferieplaner og valgte den som ga best total balanse mellom lang sammenhengende fri, smart bruk av helligdager og god spredning gjennom året.';
   const gapExplanation='Vi la inn litt tid tilbake på jobb mellom ferieperiodene der det ga mening, men beholdt sterke helligdagsbroer som ga mye fri for få feriedager.';
-  const explanation=chosen.closeGapTouched?`${baseExplanation} ${gapExplanation}`:baseExplanation;
+  const skippedMayBridges=(chosen.clusterWindowPenalty||0)+(chosen.periodClusterPenalty||0)+(chosen.concentrationWindowPenalty||0) > 0;
+  const balanceExplanation='Vi hoppet over noen korte mai-broer for å gi en mer balansert ferieplan og en bedre hovedferie.';
+  const explanation=[
+    baseExplanation,
+    chosen.closeGapTouched?gapExplanation:'',
+    skippedMayBridges?balanceExplanation:''
+  ].filter(Boolean).join(' ');
   const fallbackNote=timedOut?'Vi brukte en raskere plan fordi søket tok for lang tid.':'';
 
   if(DEBUG_PLANNER){
@@ -474,7 +518,8 @@ function plan(year,available){
     plannerDebug('summary',{evaluatedPlans,totalEfficiency:(totalFree/Math.max(1,totalUsed)).toFixed(2),unusedDays:left,runtimeMs:Math.round(performance.now()-startedAt)});
   }
 
-  return {picked,left,totalUsed,totalFree,totalGained:totalFree-totalUsed,eff:totalFree/Math.max(totalUsed,1),holidays,errors:preferred.errors,metrics:{fullCount:picked.filter(p=>p.type==='fullWeek'||p.type==='summerBlock').length,partialCount:Math.max(0,picked.filter(p=>!p.clean).length),closeGapPenalty:chosen.closeGapPenalty||0,repeatedPenalty:chosen.repeatedPenalty||0},explanation,leftoverExplanation:left>0?`${left} dag(er) ble stående igjen fordi de ikke forbedret totalplanen uten å gjøre planen mindre ryddig.`:'Alle tilgjengelige feriedager ble brukt.',qualityLabel:strategyLabels[chosen.strategy]||'Anbefalt ferieplan',highConcentrationWarning:'',fallbackNote};
+  const highConcentrationWarning=(chosen.concentrationWindowPenalty||0)>0?'Planen fordeler ferien mer utover året for å unngå for stor konsentrasjon i én kort periode.':'';
+  return {picked,left,totalUsed,totalFree,totalGained:totalFree-totalUsed,eff:totalFree/Math.max(totalUsed,1),holidays,errors:preferred.errors,metrics:{fullCount:picked.filter(p=>p.used>=5).length,partialCount:Math.max(0,picked.filter(p=>!p.clean).length),closeGapPenalty:chosen.closeGapPenalty||0,repeatedPenalty:chosen.repeatedPenalty||0,mainHoliday:chosen.twoWeekMainHoliday||false},explanation,leftoverExplanation:left>0?`${left} dag(er) ble stående igjen fordi de ikke forbedret totalplanen uten å gjøre planen mindre ryddig.`:'Alle tilgjengelige feriedager ble brukt.',qualityLabel:strategyLabels[chosen.strategy]||'Anbefalt ferieplan',highConcentrationWarning,fallbackNote};
 }
 const formatDate=d=>`${d.getDate()}. ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
 async function runPlanner(){const year=Number(document.getElementById('year').value),days=Number(document.getElementById('days').value),transferDays=Number(document.getElementById('transferDays').value||0),out=document.getElementById('result');
