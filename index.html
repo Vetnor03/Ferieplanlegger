@@ -85,6 +85,9 @@
     .calendar-actions { display:flex; gap:8px; flex-wrap: wrap; }
     .calendar-actions button { width:auto; padding:8px 12px; border-radius:10px; }
     .calendar-actions .ghost { background:#fff; color:var(--text); border:1px solid var(--border); }
+    .month-nav { display:flex; align-items:center; justify-content:space-between; gap:8px; margin: 8px 0; }
+    .month-nav button { width:auto; padding:8px 12px; border-radius:10px; }
+    .month-label { font-weight:700; text-transform: capitalize; }
     @media (min-width: 740px) {
       .app { padding: 24px 20px calc(36px + env(safe-area-inset-bottom)); }
       .summary { grid-template-columns: repeat(3, 1fr); }
@@ -142,6 +145,11 @@
           <button class="ghost" type="button" onclick="selectWholeMonth()">Velg hele måneden</button>
           <button class="ghost" type="button" onclick="clearSelectedDays()">Fjern markering</button>
         </div>
+        <div class="month-nav">
+          <button class="ghost" type="button" onclick="changePickerMonth(-1)">← Forrige</button>
+          <span id="pickerMonthLabel" class="month-label"></span>
+          <button class="ghost" type="button" onclick="changePickerMonth(1)">Neste →</button>
+        </div>
         <div id="calendar" style="margin-top:10px;"></div>
       </section>
 
@@ -158,6 +166,7 @@
 <script>
 const dayNames=["søn","man","tir","ons","tor","fre","lør"]; const monthNames=["jan","feb","mar","apr","mai","jun","jul","aug","sep","okt","nov","des"];
 const yearSel=document.getElementById('year'); const nowY=new Date().getFullYear(); for(let y=nowY;y<=nowY+3;y++){yearSel.add(new Option(String(y),String(y)));}
+let pickerMonth = new Date().getMonth();
 const season=document.getElementById('season'); season.addEventListener('change',()=>document.getElementById('customRange').style.display=season.value==='custom'?'grid':'none');
 const dateKey=d=>d.toISOString().slice(0,10); const addDays=(d,n)=>{const x=new Date(d); x.setDate(x.getDate()+n); return x;}; const isWeekend=d=>d.getDay()===0||d.getDay()===6;
 const selectedDates = new Set();
@@ -210,12 +219,36 @@ const totalUsed=picked.reduce((s,p)=>s+p.used,0),totalFree=picked.reduce((s,p)=>
 return {picked,left,totalUsed,totalFree,totalGained:totalFree-totalUsed,eff:totalFree/Math.max(totalUsed,1),holidays,errors:preferred.errors};}
 const formatDate=d=>`${d.getDate()}. ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
 function runPlanner(){const year=Number(document.getElementById('year').value),days=Number(document.getElementById('days').value),out=document.getElementById('result'); if(!days||days<1){out.innerHTML='<section class="card">Legg inn minst 1 feriedag.</section>'; return;} const res=plan(year,days);
+const resultDates=new Set(res.picked.flatMap(p=>p.days.map(d=>dateKey(d.date))));
 out.innerHTML=`<section class="card"><h2>Resultat</h2><p class="muted">Planen prøver alltid å bruke alle feriedagene dine først med ønskede perioder, deretter smarte broperioder og til slutt utfylling.</p>
 <div class="summary"><div class="box"><strong>${days}</strong>Tilgjengelige feriedager</div><div class="box"><strong>${res.totalUsed}</strong>Feriedager brukt</div><div class="box"><strong>${res.left}</strong>Ubrukte feriedager</div><div class="box"><strong>${res.totalFree}</strong>Totale kalenderdager fri</div><div class="box"><strong>${res.totalGained}</strong>Ekstra dager fra helg/helligdag</div><div class="box"><strong>${res.eff.toFixed(2)}x</strong>Effektivitet</div></div>
 ${res.errors.length?`<p class="muted">Merknad: ${res.errors.join(' ')}</p>`:''}
 <div class="legend"><span class="pill vacation">Feriedag</span><span class="pill weekend">Helg</span><span class="pill holiday">Helligdag</span><span class="pill special">Spesialdag</span></div></section>
 ${res.picked.map((p,i)=>`<section class="card period"><h2>${i+1}. ${formatDate(p.start)} – ${formatDate(p.end)}</h2><span class="reason">${p.reason}</span><p class="muted">${p.used} feriedager brukt • ${p.total} dager fri • ${p.gained} ekstra dager</p><div class="timeline">${p.days.map(d=>`<span class="pill ${d.type}">${dayNames[d.date.getDay()]} ${d.date.getDate()}. ${monthNames[d.date.getMonth()]}</span>`).join('')}</div></section>`).join('')}
 <section class="card"><h2>Norske helligdager ${year}</h2>${res.holidays.sort((a,b)=>a.date-b.date).map(h=>`<div class="holiday-row"><strong>${formatDate(h.date)}</strong><span>${h.name}</span></div>`).join('')}</section>`;
+renderResultCalendar(year, resultDates);
+}
+
+function renderResultCalendar(year, resultDates){
+  const {map}=holidaysNO(year,document.getElementById('includeSpecial').checked);
+  const html = Array.from({length:12},(_,month)=>{
+    const first=new Date(year,month,1);
+    const last=new Date(year,month+1,0);
+    const offset=(first.getDay()+6)%7;
+    let body='<div class="calendar-grid">'+['man','tir','ons','tor','fre','lør','søn'].map(d=>`<div class="weekday-head">${d}</div>`).join('')+'</div><div class="calendar-grid">';
+    for(let i=0;i<offset;i++) body += '<div class="calendar-day empty"></div>';
+    for(let day=1;day<=last.getDate();day++){
+      const d=new Date(year,month,day); const key=dateKey(d); const holiday=map[key];
+      const cls=['calendar-day'];
+      if(isWeekend(d)) cls.push('weekend');
+      if(holiday) cls.push(holiday.includes('spesialdag') ? 'special' : 'holiday');
+      if(resultDates.has(key)) cls.push('selected');
+      body += `<div class="${cls.join(' ')}">${day}</div>`;
+    }
+    body+='</div>';
+    return `<section class="card" style="margin-bottom:8px;"><h3 style="margin:0 0 8px;">${monthNames[month]} ${year}</h3>${body}</section>`;
+  }).join('');
+  document.getElementById('result').innerHTML += `<section class="card"><h2>Kalenderoversikt for resultat</h2><p class="muted">Markerte dager viser hele planen din i kalenderformat.</p>${html}</section>`;
 }
 
 function renderCalendar(){
@@ -223,33 +256,32 @@ function renderCalendar(){
   const includeSpecial=document.getElementById('includeSpecial').checked;
   const {map}=holidaysNO(year,includeSpecial);
   const root=document.getElementById('calendar');
-  let html='';
-  for(let month=0;month<12;month++){
-    const first=new Date(year,month,1);
-    const last=new Date(year,month+1,0);
-    const offset=(first.getDay()+6)%7;
-    html += `<section class="card" style="margin-bottom:8px;"><h3 style="margin:0 0 8px;">${monthNames[month]} ${year}</h3>`;
-    html += '<div class="calendar-grid">'+['man','tir','ons','tor','fre','lør','søn'].map(d=>`<div class="weekday-head">${d}</div>`).join('')+'</div>';
-    html += '<div class="calendar-grid">';
-    for(let i=0;i<offset;i++) html += '<div class="calendar-day empty"></div>';
-    for(let day=1;day<=last.getDate();day++){
-      const d=new Date(year,month,day); const key=dateKey(d); const holiday=map[key];
-      const cls=['calendar-day'];
-      if(isWeekend(d)) cls.push('weekend');
-      if(holiday) cls.push(holiday.includes('spesialdag') ? 'special' : 'holiday');
-      if(selectedDates.has(key)) cls.push('selected');
-      html += `<button type="button" class="${cls.join(' ')}" onclick="toggleDate('${key}')">${day}${holiday?`<small>${holiday.split(' ')[0]}</small>`:''}</button>`;
-    }
-    html += '</div></section>';
+  const month=((pickerMonth%12)+12)%12;
+  document.getElementById('pickerMonthLabel').textContent=`${monthNames[month]} ${year}`;
+  const first=new Date(year,month,1);
+  const last=new Date(year,month+1,0);
+  const offset=(first.getDay()+6)%7;
+  let html = '<div class="calendar-grid">'+['man','tir','ons','tor','fre','lør','søn'].map(d=>`<div class="weekday-head">${d}</div>`).join('')+'</div>';
+  html += '<div class="calendar-grid">';
+  for(let i=0;i<offset;i++) html += '<div class="calendar-day empty"></div>';
+  for(let day=1;day<=last.getDate();day++){
+    const d=new Date(year,month,day); const key=dateKey(d); const holiday=map[key];
+    const cls=['calendar-day'];
+    if(isWeekend(d)) cls.push('weekend');
+    if(holiday) cls.push(holiday.includes('spesialdag') ? 'special' : 'holiday');
+    if(selectedDates.has(key)) cls.push('selected');
+    html += `<button type="button" class="${cls.join(' ')}" onclick="toggleDate('${key}')">${day}${holiday?`<small>${holiday.split(' ')[0]}</small>`:''}</button>`;
   }
+  html += '</div>';
   root.innerHTML=html;
   writeSelectedToTextarea();
 }
 function toggleDate(key){ if(selectedDates.has(key)) selectedDates.delete(key); else selectedDates.add(key); renderCalendar(); }
-function selectWholeMonth(){ const year=Number(document.getElementById('year').value); const month=new Date().getMonth(); const last=new Date(year,month+1,0).getDate(); for(let i=1;i<=last;i++) selectedDates.add(dateKey(new Date(year,month,i))); renderCalendar(); }
+function changePickerMonth(delta){ pickerMonth=(pickerMonth+delta+12)%12; renderCalendar(); }
+function selectWholeMonth(){ const year=Number(document.getElementById('year').value); const month=((pickerMonth%12)+12)%12; const last=new Date(year,month+1,0).getDate(); for(let i=1;i<=last;i++) selectedDates.add(dateKey(new Date(year,month,i))); renderCalendar(); }
 function clearSelectedDays(){ selectedDates.clear(); renderCalendar(); }
 
-yearSel.addEventListener('change',()=>{clearSelectedDays(); renderCalendar(); runPlanner();});
+yearSel.addEventListener('change',()=>{pickerMonth=0; clearSelectedDays(); renderCalendar(); runPlanner();});
 document.getElementById('includeSpecial').addEventListener('change',()=>{renderCalendar(); runPlanner();});
 renderCalendar();
 runPlanner();
