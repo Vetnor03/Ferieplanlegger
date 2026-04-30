@@ -52,7 +52,9 @@
     .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .box { background: #f9fafb; border-radius: 12px; padding: 10px; border: 1px solid var(--border); }
     .box strong { font-size: 1.2rem; display:block; }
-    .period { border-left: 4px solid #111827; }
+    .period { border-left: 4px solid #111827; position: relative; }
+    .card-delete { position:absolute; top:12px; right:12px; width:auto; border:none; background:transparent; color:var(--muted); font-size:1.05rem; line-height:1; padding:6px; border-radius:8px; cursor:pointer; }
+    .card-delete:hover { background:#f3f4f6; color:#111827; }
     .reason { font-size: 0.85rem; color: #065f46; background: #ecfdf5; padding: 6px 10px; border-radius: 999px; display: inline-block; }
     .timeline { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
     .pill { padding: 5px 8px; border-radius: 999px; font-size: 0.75rem; }
@@ -245,7 +247,7 @@ out.innerHTML=`<section class="card"><h2>Resultat</h2><p class="muted">Planen pr
 <div class="summary"><div class="box"><strong>${days}</strong>Tilgjengelige feriedager</div><div class="box"><strong>${res.totalUsed}</strong>Feriedager brukt</div><div class="box"><strong>${res.left}</strong>Ubrukte feriedager</div><div class="box"><strong>${res.totalFree}</strong>Totale kalenderdager fri</div><div class="box"><strong>${res.totalGained}</strong>Ekstra dager fra helg/helligdag</div><div class="box"><strong>${res.eff.toFixed(2)}x</strong>Effektivitet</div></div>
 ${res.errors.length?`<p class="muted">Merknad: ${res.errors.join(' ')}</p>`:''}
 <div class="legend"><span class="pill vacation">Feriedag</span><span class="pill weekend">Helg</span><span class="pill holiday">Helligdag</span><span class="pill special">Spesialdag</span></div></section>
-${res.picked.map((p,i)=>`<section class="card period"><h2>${i+1}. ${formatDate(p.start)} – ${formatDate(p.end)}</h2><span class="reason">${p.reason}</span><p class="muted">${p.used} feriedager brukt • ${p.total} dager fri • ${p.gained} ekstra dager</p><div class="timeline">${p.days.map(d=>`<span class="pill ${d.type}">${dayNames[d.date.getDay()]} ${d.date.getDate()}. ${monthNames[d.date.getMonth()]}</span>`).join('')}</div></section>`).join('')}
+${res.picked.map((p,i)=>`<section class="card period">${p.reason==='Din ønskede periode'?`<button type="button" class="card-delete" onclick="removePreferredPeriod('${dateKey(p.start)}','${dateKey(p.end)}')" aria-label="Fjern ønsket periode" title="Fjern ønsket periode">🗑️</button>`:''}<h2>${i+1}. ${formatDate(p.start)} – ${formatDate(p.end)}</h2><span class="reason">${p.reason}</span><p class="muted">${p.used} feriedager brukt • ${p.total} dager fri • ${p.gained} ekstra dager</p><div class="timeline">${p.days.map(d=>`<span class="pill ${d.type}">${dayNames[d.date.getDay()]} ${d.date.getDate()}. ${monthNames[d.date.getMonth()]}</span>`).join('')}</div></section>`).join('')}
 <section class="card"><h2>Norske helligdager ${year}</h2>${res.holidays.sort((a,b)=>a.date-b.date).map(h=>`<div class="holiday-row"><strong>${formatDate(h.date)}</strong><span>${h.name}</span></div>`).join('')}</section>`;
 renderResultCalendar(year, resultDates);
 }
@@ -296,6 +298,20 @@ function renderCalendar(){
   html += '</div>';
   root.innerHTML=html;
   writeSelectedToTextarea();
+}
+
+function removePreferredPeriod(startKey,endKey){
+  const preferred=document.getElementById('preferred');
+  const escapedStart=startKey.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const escapedEnd=endKey.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const matchRe=new RegExp(`^\\s*${escapedStart}\\s+to\\s+${escapedEnd}\\s*$`,'i');
+  const lines=preferred.value.split(/\n+/).map(l=>l.trim()).filter(Boolean);
+  preferred.value=lines.filter(line=>!matchRe.test(line)).join('\n');
+  for(let d=new Date(startKey); d<=new Date(endKey); d=addDays(d,1)){
+    selectedDates.delete(dateKey(d));
+  }
+  renderCalendar();
+  runPlanner();
 }
 function toggleDate(key){ if(selectedDates.has(key)) selectedDates.delete(key); else selectedDates.add(key); renderCalendar(); }
 function changePickerMonth(delta){ pickerMonth=(pickerMonth+delta+12)%12; renderCalendar(); }
