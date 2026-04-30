@@ -92,7 +92,8 @@
     .calendar-day.special { background: var(--special); color: var(--special-strong); }
     .calendar-day.selected { outline: 2px solid #16a34a; outline-offset: -2px; }
     .calendar-day.selected:not(.weekend):not(.holiday):not(.special) { background: var(--selected); color: var(--vac-strong); }
-    .calendar-day.weekend.continuity { background: var(--selected); color: var(--vac-strong); }
+    .calendar-day.result-vacation-used { background: var(--selected); color: var(--vac-strong); }
+    .calendar-day.result-vacation-connected-weekend { background: var(--selected); color: var(--vac-strong); }
     .calendar-day small { display:block; color: var(--muted); font-size:0.7rem; }
     .weekday-head { text-align:center; color: var(--muted); font-size:0.75rem; margin-bottom:4px; }
     .calendar-actions { display:flex; gap:8px; flex-wrap: wrap; }
@@ -236,9 +237,11 @@ today.setHours(0,0,0,0);
 const dateKey=d=>d.toISOString().slice(0,10); const addDays=(d,n)=>{const x=new Date(d); x.setDate(x.getDate()+n); return x;}; const isWeekend=d=>d.getDay()===0||d.getDay()===6;
 const selectedDates = new Set();
 const DEBUG_PLANNER = false;
+const DEBUG_CALENDAR = false;
 const DEBUG_LOADING = false;
 const FORCE_LOADING_PREVIEW = false;
 function plannerDebug(...args){ if(DEBUG_PLANNER) console.log('[PLANNER]',...args); }
+function calendarDebug(...args){ if(DEBUG_CALENDAR) console.log('[CALENDAR]',...args); }
 function loadingDebug(...args){ if(DEBUG_LOADING) console.log(...args); }
 const PLANNER_LIMITS = {
   maxCandidatePeriods: 240,
@@ -685,6 +688,12 @@ function plan(year,available){
   const fallbackNote=timedOut?'Vi brukte en raskere plan fordi søket tok for lang tid.':'';
 
   if(DEBUG_PLANNER){
+    const julyStartDebug=new Date(year,6,1);
+    const chosenVacationDays=picked.flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>d.date));
+    const beforeJulyCount=chosenVacationDays.filter(d=>d<julyStartDebug).length;
+    const percentVacationBeforeJuly1=(beforeJulyCount/Math.max(1,chosenVacationDays.length))*100;
+    const autumnStartDebug=new Date(year,8,1), autumnEndDebug=new Date(year,10,30);
+    const hasAutumnBreak=picked.some(p=>p.used>=2 && p.start<=autumnEndDebug && p.end>=autumnStartDebug);
     plannerDebug('top-candidates', candidates.slice(0,20).map(c=>({reason:c.reason,type:c.type,used:c.used,total:c.total,eff:c.efficiency.toFixed(2),quality:c.quality})));
     plannerDebug('chosen-candidates', picked.map(c=>({reason:c.reason,why:c.chosenWhy,used:c.used,total:c.total,eff:c.efficiency?.toFixed?.(2)})));
     plannerDebug('rejected-candidates', candidates.filter(c=>!picked.some(p=>p.id===c.id)).slice(0,20).map(c=>({reason:c.reason,used:c.used,eff:c.efficiency.toFixed(2),why:'overlap or capacity or lower score'})));
@@ -697,10 +706,23 @@ function plan(year,available){
       reason:p.reason
     })));
     plannerDebug('chosen-plan-clustering',{
+      hasSummerMainHoliday:Boolean(chosen.twoWeekMainHoliday),
+      hasAutumnBreak,
+      percentVacationBeforeJuly1:Number(percentVacationBeforeJuly1.toFixed(1)),
+      seasonCount:chosen.usedSeasons||0,
       rolling45MaxPeriods:chosen.rolling45MaxPeriods||0,
       mayMiniBreakCount:chosen.mayMiniBreakCount||0,
       clusteringPenalty:chosen.clusteringPenalty||0,
       hardClusterViolation:Boolean(chosen.hardClusterViolation)
+    });
+    plannerDebug('chosen-final-score-breakdown',{
+      finalScore:Number((chosen.score||0).toFixed(2)),
+      closeGapPenalty:Number((chosen.closeGapPenalty||0).toFixed(2)),
+      repeatedPenalty:Number((chosen.repeatedPenalty||0).toFixed(2)),
+      workRhythmPenalty:Number((chosen.repeatedWorkRhythmPenalty||0).toFixed(2)),
+      rolling45Penalty:Number((chosen.repeatedMiniBreakWindowPenalty||0).toFixed(2)),
+      extremeWindowPenalty:Number((chosen.extremeMiniBreakWindowPenalty||0).toFixed(2)),
+      concentrationWindowPenalty:Number((chosen.concentrationWindowPenalty||0).toFixed(2))
     });
     const rejectedTop5=[...validVariants]
       .filter(v=>v.strategy!==chosen.strategy)
@@ -731,33 +753,34 @@ function plan(year,available){
   return {picked,left,totalUsed,totalFree,totalGained:totalFree-totalUsed,eff:totalFree/Math.max(totalUsed,1),holidays,errors:preferred.errors,metrics:{fullCount:picked.filter(p=>p.used>=5).length,partialCount:Math.max(0,picked.filter(p=>!p.clean).length),closeGapPenalty:chosen.closeGapPenalty||0,repeatedPenalty:chosen.repeatedPenalty||0,repeatedWorkRhythmPenalty:chosen.repeatedWorkRhythmPenalty||0,repeatedMiniBreakWindowPenalty:chosen.repeatedMiniBreakWindowPenalty||0,extremeMiniBreakWindowPenalty:chosen.extremeMiniBreakWindowPenalty||0,mainHoliday:chosen.twoWeekMainHoliday||false},explanation,leftoverExplanation:left>0?`${left} dag(er) ble stående igjen fordi de ikke forbedret totalplanen uten å gjøre planen mindre ryddig.`:'Alle tilgjengelige feriedager ble brukt.',qualityLabel:strategyLabels[chosen.strategy]||'Anbefalt ferieplan',highConcentrationWarning,fallbackNote};
 }
 const formatDate=d=>`${d.getDate()}. ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
-function decorateVacationContinuity(baseVacationDates){
-  const out=new Set(baseVacationDates);
-  const vacationSet=new Set(baseVacationDates);
-  for(const key of vacationSet){
-    const d=new Date(key);
-    if(d.getDay()!==5) continue;
-    const sat=addDays(d,1);
-    const sun=addDays(d,2);
-    if(sat.getDay()===6) out.add(dateKey(sat));
-    if(sun.getDay()===0) out.add(dateKey(sun));
+function isDateInsidePeriod(date, period){
+  return date >= period.start && date <= period.end;
+}
+function isDatePaidVacation(date, planPeriods){
+  return planPeriods.some(p=>p.days.some(day=>day.type==='vacation' && dateKey(day.date)===dateKey(date)));
+}
+function getResultDayClass(date, planPeriods, holidayMap){
+  // Visual test cases:
+  // 1) Thu–Sun period with Thu/Fri vacation => Sat/Sun become vacation-connected-weekend.
+  // 2) Mon–Fri period => preceding Sat/Sun stay normal-weekend unless period actually includes them.
+  // 3) Fri–Mon period => Sat/Sun inside period become vacation-connected-weekend.
+  // 4) Isolated weekend with no period overlap => normal-weekend.
+  const key=dateKey(date);
+  const holiday=holidayMap[key];
+  if(holiday) return holiday.includes('spesialdag') ? 'special-day' : 'holiday';
+  const weekend=isWeekend(date);
+  const paidVacation=isDatePaidVacation(date, planPeriods);
+  if(paidVacation) return 'vacation-used';
+  if(weekend){
+    const containingPeriod=planPeriods.find(p=>isDateInsidePeriod(date,p));
+    if(containingPeriod){
+      const reason='insidePeriod';
+      calendarDebug('connected-weekend', {date:key, period:`${dateKey(containingPeriod.start)}..${dateKey(containingPeriod.end)}`, reason});
+      return 'vacation-connected-weekend';
+    }
+    return 'normal-weekend';
   }
-  for(const key of vacationSet){
-    const d=new Date(key);
-    if(d.getDay()!==1) continue;
-    const sun=addDays(d,-1);
-    const sat=addDays(d,-2);
-    if(sat.getDay()===6) out.add(dateKey(sat));
-    if(sun.getDay()===0) out.add(dateKey(sun));
-  }
-  for(const key of vacationSet){
-    const d=new Date(key);
-    if(!isWeekend(d)) continue;
-    const prev=addDays(d,-1);
-    const next=addDays(d,1);
-    if(vacationSet.has(dateKey(prev)) || vacationSet.has(dateKey(next))) out.add(key);
-  }
-  return out;
+  return 'normal-day';
 }
 async function runPlanner(){const year=Number(document.getElementById('year').value),days=Number(document.getElementById('days').value),transferDays=Number(document.getElementById('transferDays').value||0),out=document.getElementById('result');
 const button=document.querySelector('button[onclick="runPlanner()"]');
@@ -827,8 +850,6 @@ if(res.picked.length===0){
 }
 const durationMs=Math.round(performance.now()-startedAt);
 loadingDebug(`planner finished in ${durationMs} ms`);
-const paidVacationDates=new Set(res.picked.flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>dateKey(d.date))));
-const resultDates=decorateVacationContinuity(paidVacationDates);
 const summaryCards=[
   {label:'Feriedager', value:String(days)},
   {label:'Overføres', value:String(transferDays)},
@@ -840,6 +861,7 @@ const summaryCards=[
   {label:'Effektivitet', value:`${res.eff.toFixed(2)}x`}
 ];
 const transferText=transferDays>0?`<p class="summary-help">${transferDays} feriedager holdes av til neste år.</p>`:'';
+const {map:resultHolidayMap}=holidaysNO(year,document.getElementById('includeSpecial').checked);
 out.innerHTML=`<section class="card"><h2>Resultat</h2><p class="reason">${res.qualityLabel}</p><p class="muted">${res.explanation}</p>
 <div class="summary">${summaryCards.map(card=>`<div class="box"><strong>${card.value}</strong><span>${card.label}</span></div>`).join('')}</div>
 <p class="summary-help">Effektivitet viser hvor mange kalenderdager fri du får per brukt feriedag.</p>
@@ -849,9 +871,9 @@ ${res.fallbackNote?`<p class="muted">${res.fallbackNote}</p>`:''}${res.highConce
 <p class="muted">${res.leftoverExplanation}</p>
 <p class="muted">${res.metrics.partialCount===0?'Planen unngikk delvise uker og prioriterte hele ferieuker.':'Noen delvise uker ble beholdt for å koble ferie mot helg/helligdager og fortsatt gi høy ferieeffekt.'}</p>
 <div class="legend"><span class="pill vacation">Feriedag</span><span class="pill weekend">Helg</span><span class="pill holiday">Helligdag</span><span class="pill special">Spesialdag</span></div></section>
-${res.picked.map((p,i)=>`<section class="card period"><h2>${i+1}. ${formatDate(p.start)} – ${formatDate(p.end)}</h2><span class="reason">${p.reason}</span><p class="muted">${p.used} feriedager brukt • ${p.total} dager fri • ${p.gained} ekstra dager</p><div class="timeline">${p.days.map(d=>`<span class="pill ${d.type}">${dayNames[d.date.getDay()]} ${d.date.getDate()}. ${monthNames[d.date.getMonth()]}</span>`).join('')}</div></section>`).join('')}
+${res.picked.map((p,i)=>`<section class="card period"><h2>${i+1}. ${formatDate(p.start)} – ${formatDate(p.end)}</h2><span class="reason">${p.reason}</span><p class="muted">${p.used} feriedager brukt • ${p.total} dager fri • ${p.gained} ekstra dager</p><div class="timeline">${p.days.map(d=>{const c=getResultDayClass(d.date,res.picked,resultHolidayMap);const pill=(c==='vacation-used'||c==='vacation-connected-weekend')?'vacation':(c==='normal-weekend'?'weekend':(c==='special-day'?'special':(c==='holiday'?'holiday':'')));return `<span class="pill ${pill}">${dayNames[d.date.getDay()]} ${d.date.getDate()}. ${monthNames[d.date.getMonth()]}</span>`;}).join('')}</div></section>`).join('')}
 <section class="card"><h2>Norske helligdager ${year}</h2>${res.holidays.sort((a,b)=>a.date-b.date).map(h=>`<div class="holiday-row"><strong>${formatDate(h.date)}</strong><span>${h.name}</span></div>`).join('')}</section>`;
-renderResultCalendar(year, resultDates);
+renderResultCalendar(year, res.picked);
 } catch(err){
   console.error(err);
   plannerDebug('runPlanner error',err);
@@ -861,7 +883,7 @@ renderResultCalendar(year, resultDates);
 }
 }
 
-function renderResultCalendar(year, resultDates){
+function renderResultCalendar(year, planPeriods){
   const {map}=holidaysNO(year,document.getElementById('includeSpecial').checked);
   const html = Array.from({length:12},(_,month)=>{
     const first=new Date(year,month,1);
@@ -870,13 +892,15 @@ function renderResultCalendar(year, resultDates){
     let body='<div class="calendar-grid">'+['man','tir','ons','tor','fre','lør','søn'].map(d=>`<div class="weekday-head">${d}</div>`).join('')+'</div><div class="calendar-grid">';
     for(let i=0;i<offset;i++) body += '<div class="calendar-day empty"></div>';
     for(let day=1;day<=last.getDate();day++){
-      const d=new Date(year,month,day); const key=dateKey(d); const holiday=map[key];
+      const d=new Date(year,month,day);
       const cls=['calendar-day'];
-      const isWeekendDay=isWeekend(d);
-      if(isWeekendDay) cls.push('weekend');
-      if(holiday) cls.push(holiday.includes('spesialdag') ? 'special' : 'holiday');
-      if(resultDates.has(key)) cls.push('selected');
-      if(isWeekendDay && resultDates.has(key)) cls.push('continuity');
+      const visualClass=getResultDayClass(d,planPeriods,map);
+      if(visualClass==='vacation-used') cls.push('result-vacation-used');
+      else if(visualClass==='vacation-connected-weekend') cls.push('result-vacation-connected-weekend');
+      else if(visualClass==='holiday') cls.push('holiday');
+      else if(visualClass==='special-day') cls.push('special');
+      else if(visualClass==='normal-weekend') cls.push('weekend');
+      else cls.push('normal-day');
       body += `<div class="${cls.join(' ')}">${day}</div>`;
     }
     body+='</div>';
