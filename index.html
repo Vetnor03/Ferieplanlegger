@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Lag ferieplan</title>
+  <title>Ferieplan</title>
   <style>
     :root {
       --bg: #f3f4f6;
@@ -99,6 +99,9 @@
     .month-nav { display:flex; align-items:center; justify-content:space-between; gap:8px; margin: 8px 0; }
     .month-nav button { width:auto; padding:8px 12px; border-radius:10px; }
     .month-label { font-weight:700; text-transform: capitalize; }
+    .loading-wrap { display:flex; align-items:center; gap:10px; color: var(--muted); font-weight:600; }
+    .spinner { width:18px; height:18px; border:2px solid #d1d5db; border-top-color:#111827; border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     @media (min-width: 740px) {
       .app { padding: 26px 22px calc(36px + env(safe-area-inset-bottom)); }
       .summary { grid-template-columns: repeat(4, minmax(0,1fr)); }
@@ -109,7 +112,7 @@
 <body>
 <main class="app">
   <section class="hero">
-    <h1>Lag ferieplan</h1>
+    <h1>Ferieplan</h1>
     <p class="subtitle">Få en enkel og smart plan for feriedagene dine – med mest mulig sammenhengende fri.</p>
   </section>
 
@@ -164,9 +167,8 @@
       </div>
 
       <div>
-        <label for="preferred">Foretrukne ferieperioder (valgfritt)</label>
-        <p class="help">Klikk i kalenderen under for å markere dager. Tekstfeltet fylles automatisk, men kan også redigeres manuelt.</p>
-        <textarea id="preferred" placeholder="2026-07-06 to 2026-07-17\n2026-12-24 to 2026-12-31"></textarea>
+        <label>Foretrukne ferieperioder (valgfritt)</label>
+        <p class="help">Velg dager direkte i kalenderen under. Valgene brukes automatisk i planleggingen.</p>
       </div>
 
       <section class="card" style="margin:0;">
@@ -190,7 +192,7 @@
         <span>Regn julaften (24.12) og nyttårsaften (31.12) som nyttige spesialdager</span>
       </label>
 
-      <button onclick="runPlanner()">Lag ferieplan</button>
+      <button onclick="runPlanner()">Ferieplan</button>
     </div>
   </section>
 
@@ -236,17 +238,11 @@ function selectedDatesToPeriods(year,map){
   return periods;
 }
 function writeSelectedToTextarea(){
-  const year=Number(document.getElementById('year').value);
-  const {map}=holidaysNO(year,document.getElementById('includeSpecial').checked);
-  const text=selectedDatesToPeriods(year,map).map(p=>`${dateKey(p.start)} to ${dateKey(p.end)}`).join('\n');
-  document.getElementById('preferred').value=text;
   document.getElementById('selectedCount').textContent=`${selectedDates.size} dager valgt`;
 }
 function parsePreferred(year,map){
-const txt=document.getElementById('preferred').value.trim();
-if(!txt) return {periods:selectedDatesToPeriods(year,map),errors:[]};
-const errors=[],periods=[];
-txt.split(/\n+/).forEach((line,i)=>{const m=line.trim().match(/(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/i); if(!m){errors.push(`Linje ${i+1} har feil format.`); return;} const a=new Date(m[1]),b=new Date(m[2]); if(isNaN(a)||isNaN(b)||a>b){errors.push(`Linje ${i+1} har ugyldig datointervall.`); return;} if(b<today){errors.push(`Linje ${i+1} ble hoppet over fordi perioden allerede har vært.`); return;} const startDate=a<today?new Date(today):a; periods.push(evaluatePeriod(startDate,b,map,'Din ønskede periode'));}); periods.sort((a,b)=>a.start-b.start); return {periods,errors};}
+  return {periods:selectedDatesToPeriods(year,map),errors:[]};
+}
 function overlaps(p,set){return p.days.some(d=>set.has(dateKey(d.date)));}
 function isoWeekKey(d){
   const tmp=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
@@ -403,7 +399,11 @@ for(;;){
     const efficiencyModeScore=(c.gained*2.4)+(c.total*0.45)-(c.used*0.08)+(connectsToHolidayOrWeekend?0.8:0);
     const realismModeScore=(baseValue*0.9)-realismCost;
     const preferenceBlend=Math.min(Math.max(groupingPreference,0),1);
-    const balancedScore=(efficiencyModeScore*(1-preferenceBlend))+(realismModeScore*preferenceBlend);
+    const spreadBonus=(1-metrics.spreadPenalty)*0.9;
+    const ignorePartialModeScore=(c.gained*2.7)+(c.total*0.55)-(c.used*0.06)+(connectsToHolidayOrWeekend?0.4:0)+spreadBonus;
+    const balancedScore=groupingPreference===0
+      ? ignorePartialModeScore
+      : (efficiencyModeScore*(1-preferenceBlend))+(realismModeScore*preferenceBlend);
     if(!best||balancedScore>best.balancedScore){
       best={period:c,balancedScore};
     }
@@ -422,7 +422,9 @@ const totalUsed=picked.reduce((s,p)=>s+p.used,0),totalFree=picked.reduce((s,p)=>
 const metrics=analyzePlan(picked.sort((a,b)=>a.start-b.start),map);
 return {picked,left,totalUsed,totalFree,totalGained:totalFree-totalUsed,eff:totalFree/Math.max(totalUsed,1),holidays,errors:preferred.errors,metrics};}
 const formatDate=d=>`${d.getDate()}. ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
-function runPlanner(){const year=Number(document.getElementById('year').value),days=Number(document.getElementById('days').value),transferDays=Number(document.getElementById('transferDays').value||0),out=document.getElementById('result'); if(!days||days<1){out.innerHTML='<section class="card">Legg inn minst 1 feriedag.</section>'; return;} if(transferDays<0||transferDays>days){out.innerHTML=`<section class="card">Overføringsdager må være mellom 0 og ${days}.</section>`; return;} const available=Math.max(0,days-transferDays); const res=plan(year,available);
+function runPlanner(){const year=Number(document.getElementById('year').value),days=Number(document.getElementById('days').value),transferDays=Number(document.getElementById('transferDays').value||0),out=document.getElementById('result');
+out.innerHTML='<section class="card"><div class="loading-wrap"><span class="spinner"></span><span>Lager ferieplan...</span></div></section>';
+setTimeout(()=>{ if(!days||days<1){out.innerHTML='<section class="card">Legg inn minst 1 feriedag.</section>'; return;} if(transferDays<0||transferDays>days){out.innerHTML=`<section class="card">Overføringsdager må være mellom 0 og ${days}.</section>`; return;} const available=Math.max(0,days-transferDays); const res=plan(year,available);
 const resultDates=new Set(res.picked.flatMap(p=>p.days.map(d=>dateKey(d.date))));
 const summaryCards=[
   {label:'Feriedager', value:String(days)},
@@ -442,9 +444,10 @@ ${transferText}
 ${res.errors.length?`<p class="muted">Merknad: ${res.errors.join(' ')}</p>`:''}
 <p class="muted">${res.metrics.partialCount===0?'Planen unngikk delvise uker og prioriterte hele ferieuker.':'Noen delvise uker ble beholdt for å koble ferie mot helg/helligdager og fortsatt gi høy ferieeffekt.'}</p>
 <div class="legend"><span class="pill vacation">Feriedag</span><span class="pill weekend">Helg</span><span class="pill holiday">Helligdag</span><span class="pill special">Spesialdag</span></div></section>
-${res.picked.map((p,i)=>`<section class="card period">${p.reason==='Din ønskede periode'?`<button type="button" class="card-delete" onclick="removePreferredPeriod('${dateKey(p.start)}','${dateKey(p.end)}')" aria-label="Fjern ønsket periode" title="Fjern ønsket periode">🗑️</button>`:''}<h2>${i+1}. ${formatDate(p.start)} – ${formatDate(p.end)}</h2><span class="reason">${p.reason}</span><p class="muted">${p.used} feriedager brukt • ${p.total} dager fri • ${p.gained} ekstra dager</p><div class="timeline">${p.days.map(d=>`<span class="pill ${d.type}">${dayNames[d.date.getDay()]} ${d.date.getDate()}. ${monthNames[d.date.getMonth()]}</span>`).join('')}</div></section>`).join('')}
+${res.picked.map((p,i)=>`<section class="card period"><h2>${i+1}. ${formatDate(p.start)} – ${formatDate(p.end)}</h2><span class="reason">${p.reason}</span><p class="muted">${p.used} feriedager brukt • ${p.total} dager fri • ${p.gained} ekstra dager</p><div class="timeline">${p.days.map(d=>`<span class="pill ${d.type}">${dayNames[d.date.getDay()]} ${d.date.getDate()}. ${monthNames[d.date.getMonth()]}</span>`).join('')}</div></section>`).join('')}
 <section class="card"><h2>Norske helligdager ${year}</h2>${res.holidays.sort((a,b)=>a.date-b.date).map(h=>`<div class="holiday-row"><strong>${formatDate(h.date)}</strong><span>${h.name}</span></div>`).join('')}</section>`;
 renderResultCalendar(year, resultDates);
+}, 500);
 }
 
 function renderResultCalendar(year, resultDates){
@@ -495,20 +498,6 @@ function renderCalendar(){
   writeSelectedToTextarea();
 }
 
-function removePreferredPeriod(startKey,endKey){
-  const preferred=document.getElementById('preferred');
-  const escapedStart=startKey.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  const escapedEnd=endKey.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  const matchRe=new RegExp(`^\\s*${escapedStart}\\s+to\\s+${escapedEnd}\\s*$`,'i');
-  const lines=preferred.value.split(/\n+/).map(l=>l.trim()).filter(Boolean);
-  preferred.value=lines.filter(line=>!matchRe.test(line)).join('\n');
-  for(let d=new Date(startKey); d<=new Date(endKey); d=addDays(d,1)){
-    selectedDates.delete(dateKey(d));
-  }
-  renderCalendar();
-  runPlanner();
-}
-
 function fillShortGaps(){
   const sorted=[...selectedDates].map(k=>new Date(k)).sort((a,b)=>a-b);
   let changed=false;
@@ -542,8 +531,8 @@ function changePickerMonth(delta){ pickerMonth=(pickerMonth+delta+12)%12; render
 function selectWholeMonth(){ const year=Number(document.getElementById('year').value); const month=((pickerMonth%12)+12)%12; const last=new Date(year,month+1,0).getDate(); for(let i=1;i<=last;i++) selectedDates.add(dateKey(new Date(year,month,i))); renderCalendar(); }
 function clearSelectedDays(){ selectedDates.clear(); renderCalendar(); }
 
-yearSel.addEventListener('change',()=>{pickerMonth=0; clearSelectedDays(); renderCalendar(); runPlanner();});
-document.getElementById('includeSpecial').addEventListener('change',()=>{renderCalendar(); runPlanner();});
+yearSel.addEventListener('change',()=>{pickerMonth=0; clearSelectedDays(); renderCalendar(); document.getElementById('result').innerHTML='';});
+document.getElementById('includeSpecial').addEventListener('change',()=>{renderCalendar(); document.getElementById('result').innerHTML='';});
 document.getElementById('groupingPreference').addEventListener('input',(e)=>{
   const v=Number(e.target.value||100);
   const help=document.getElementById('groupingPreferenceHelp');
@@ -554,11 +543,9 @@ document.getElementById('groupingPreference').addEventListener('input',(e)=>{
   }else{
     help.textContent=`${v}: gradvis sterkere straff for delvise uker og tettliggende ferieblokker.`;
   }
-  runPlanner();
 });
-document.getElementById('transferDays').addEventListener('input',runPlanner);
+document.getElementById('transferDays').addEventListener('input',()=>{document.getElementById('result').innerHTML='';});
 renderCalendar();
-runPlanner();
 </script>
 </body>
 </html>
