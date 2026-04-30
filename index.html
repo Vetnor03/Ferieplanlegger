@@ -157,8 +157,8 @@
       </div>
       <div>
         <label for="groupingPreference">Spredning</label>
-        <input id="groupingPreference" type="range" min="0" max="100" value="100" />
-        <p class="help" id="groupingPreferenceHelp">0: spre ferien gjennom året. 100: grupper ferien i lengre sammenhengende blokker.</p>
+        <input id="groupingPreference" type="range" min="0" max="100" value="50" />
+        <p class="help" id="groupingPreferenceHelp">0–30: spred ferien utover året • 31–70: balansert • 71–84: mer samlet • 85–100: tillat svært lang sammenhengende ferie.</p>
       </div>
 
       <div class="form-cols" id="customRange" style="display:none;">
@@ -216,6 +216,12 @@ const PLANNER_LIMITS = {
   maxIterations: 16,
   maxRuntimeMs: 2000
 };
+function groupingShareLimit(groupingPreference){
+  if(groupingPreference>0.85) return 1.0;
+  if(groupingPreference>0.7) return 0.8;
+  if(groupingPreference>=0.5) return 0.65;
+  return 0.45;
+}
 
 function easterSunday(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return new Date(y,mo-1,da);}
 function holidaysNO(year, includeSpecial){const e=easterSunday(year);const holidays=[{date:new Date(year,0,1),name:'Nyttårsdag'},{date:addDays(e,-3),name:'Skjærtorsdag'},{date:addDays(e,-2),name:'Langfredag'},{date:addDays(e,0),name:'1. påskedag'},{date:addDays(e,1),name:'2. påskedag'},{date:new Date(year,4,1),name:'Arbeidernes dag'},{date:new Date(year,4,17),name:'Grunnlovsdag (17. mai)'},{date:addDays(e,39),name:'Kristi himmelfartsdag'},{date:addDays(e,49),name:'1. pinsedag'},{date:addDays(e,50),name:'2. pinsedag'},{date:new Date(year,11,25),name:'1. juledag'},{date:new Date(year,11,26),name:'2. juledag'}];
@@ -411,14 +417,15 @@ const selectedPeriods=selectedDatesToPeriods(year,map);
 const selectedKeys=new Set(selectedPeriods.flatMap(p=>p.days.map(d=>dateKey(d.date))));
 const xmasRequired=seasonValue==='xmas';
 
-const strategies=['maximum_days_off','balanced','spread_out','full_weeks','summer_priority'];
+const strategies=['maximum_days_off','balanced','spread_out','full_weeks','summer_priority','max_continuous'];
 if(xmasRequired) strategies.push('christmas_included');
 if(selectedPeriods.length) strategies.push('user_selected_priority');
 
 function strategyWeights(name){
   const spreadMode=1-groupingPreference;
-  const w={gained:2.2,fullWeek:1.5,partial:-1.3,spread:0,longGap:0.8,cluster:0,season:0.8,xmas:0,user:1.5,summer:0,isolated:-1.2,shortGap:-1.2,singleDay:-0.9,minWeeks:0,leftover:-0.5};
+  const w={gained:2.2,fullWeek:1.5,partial:-1.3,spread:0,longGap:0.8,cluster:0,season:0.8,xmas:0,user:1.5,summer:0,isolated:-1.2,shortGap:-1.2,singleDay:-0.9,minWeeks:0,leftover:-0.5,balance:4.6,concentration:-8.5,holidayBridge:3.5,outsideSummer:2.8,periodCount:2.2};
   if(name==='maximum_days_off') w.gained=3.1;
+  if(name==='max_continuous'){ w.gained=3.7; w.concentration=2.2; w.balance=0.6; w.periodCount=-1.4; }
   if(name==='full_weeks'){w.fullWeek=4.5;w.partial=-2.5;w.cluster=1.5;}
   if(name==='spread_out'){w.spread=6.2;w.cluster=-4.4;w.shortGap=-2.2;w.singleDay=-1.5;}
   if(name==='summer_priority') w.summer=3.2;
@@ -444,6 +451,15 @@ function scorePlan(periods,left,strategy){
   const cleanLongWeekends=sorted.filter(p=>p.used<=2&&p.total>=3).length;
   const singleDayIsolated=sorted.filter(p=>p.used===1&&p.total===1).length;
   const oneLargeClusterPenalty=(groupingPreference<0.2&&metrics.topPeriodShare>0.5)?(metrics.topPeriodShare*10):0;
+  const periodCount=sorted.length;
+  const summerBlocks=sorted.filter(p=>p.days.some(d=>d.date.getMonth()>=5&&d.date.getMonth()<=7) && p.total>=14).length;
+  const outsideSummerBreak=sorted.some(p=>!p.days.some(d=>d.date.getMonth()>=5&&d.date.getMonth()<=7) && p.total>=4) ? 1 : 0;
+  const holidayBridgeHits=sorted.filter(p=>p.days.some(d=>!!map[dateKey(d.date)])).length;
+  const desiredPeriods=groupingPreference<0.3?4:(groupingPreference<=0.7?3:2);
+  const periodCountScore=Math.max(0,1-Math.abs(periodCount-desiredPeriods)/Math.max(desiredPeriods,1));
+  const shareLimit=groupingShareLimit(groupingPreference);
+  const concentrationOver=Math.max(0,metrics.topPeriodShare-shareLimit);
+  const concentrationPenalty=concentrationOver*14 + (groupingPreference<=0.84&&metrics.topPeriodShare>0.7?6:0);
   const meetsMin=minContinuousWeeks===0||sorted.some(p=>p.total>=minContinuousWeeks*7);
   const w=strategyWeights(strategy);
   const seasonPrefScore=(seasonValue==='all'||seasonValue==='custom')?0:(sorted.flatMap(p=>p.days).filter(d=>inSeasonPref(d.date)).length/Math.max(free,1));
@@ -452,7 +468,9 @@ function scorePlan(periods,left,strategy){
     metrics.usedMonths*w.spread + metrics.topTwoPeriodShare*w.cluster + cleanLongWeekends*w.longGap +
     metrics.isolatedWorkdayPenalty*w.isolated + metrics.shortGapPenalty*w.shortGap +
     seasonPrefScore*w.season + (xmasHit?1:0)*w.xmas + userHit*w.user + (summerHit?1:0)*w.summer +
-    singleDayIsolated*w.singleDay + (meetsMin?1:-1)*w.minWeeks + left*w.leftover - oneLargeClusterPenalty;
+    singleDayIsolated*w.singleDay + (meetsMin?1:-1)*w.minWeeks + left*w.leftover - oneLargeClusterPenalty +
+    periodCountScore*w.periodCount + summerBlocks*w.balance + outsideSummerBreak*w.outsideSummer +
+    holidayBridgeHits*w.holidayBridge + concentrationPenalty*w.concentration;
   return {score,metrics,used,free,xmasHit,userHit,meetsMin};
 }
 
@@ -497,20 +515,30 @@ if(plans.length>PLANNER_LIMITS.maxCompletePlans){
 plans.sort((a,b)=>b.scored.score-a.scored.score);
 plannerDebug('complete plans',plans.map(p=>({strategy:p.strategy,score:p.scored.score,left:p.left})));
 plannerDebug('stats',{available,candidates:candidates.length,strategies:strategies.length,plans:plans.length,durationMs:Math.round(performance.now()-startedAt),exitReason});
-const chosen=plans[0]||{periods:[],left:available,scored:scorePlan([],available,'balanced'),strategy:'balanced'};
+const allowLongContinuous = groupingPreference>=0.85 || minContinuousWeeks>=4;
+const balancedCandidate=plans.find(p=>p.strategy==='balanced');
+const chosen=(!allowLongContinuous && balancedCandidate)
+  ? balancedCandidate
+  : (plans[0]||{periods:[],left:available,scored:scorePlan([],available,'balanced'),strategy:'balanced'});
 const picked=[...chosen.periods].sort((a,b)=>a.start-b.start);
 const labels={
   maximum_days_off:'Mest fri for dagene',
-  balanced:'Mest balansert',
+  balanced:'Anbefalt balanse',
   spread_out:'Best spredning',
   full_weeks:'Flest hele uker',
   summer_priority:'Sommerfokus',
+  max_continuous:'Maks sammenhengende fri',
   christmas_included:'Jul inkludert',
   user_selected_priority:'Dine valg prioritert'
 };
-const explanation=`Vi valgte strategien «${labels[chosen.strategy]||chosen.strategy}» fordi den ga best helhet: ${chosen.scored.metrics.fullCount} hele uker, ${chosen.scored.free} fridager totalt og ${chosen.left} ubrukt(e) dag(er).`;
+const explanation=(chosen.strategy==='balanced')
+  ? `Vi valgte en balansert plan fordi den gir én god hovedferie, bruker helligdager smart og sprer fridagene bedre utover året.`
+  : `Vi valgte strategien «${labels[chosen.strategy]||chosen.strategy}» fordi den ga best helhet for valgene dine: ${chosen.scored.metrics.fullCount} hele uker, ${chosen.scored.free} fridager totalt og ${chosen.left} ubrukt(e) dag(er).`;
 const leftoverExplanation=chosen.left>0?`${chosen.left} dag(er) ble ikke brukt fordi flere enkeltdager ville gitt urolig plan med mange delvise arbeidsuker.`:'Alle tilgjengelige feriedager ble brukt i perioder som ga sammenhengende verdi.';
-return {picked,left:chosen.left,totalUsed:chosen.scored.used,totalFree:chosen.scored.free,totalGained:chosen.scored.free-chosen.scored.used,eff:chosen.scored.free/Math.max(chosen.scored.used,1),holidays,errors:preferred.errors,metrics:chosen.scored.metrics,explanation,leftoverExplanation,qualityLabel:labels[chosen.strategy]||'Anbefalt plan'};
+const highConcentrationWarning = chosen.scored.metrics.topPeriodShare>0.7
+  ? 'Dette gir mye sammenhengende fri, men bruker nesten hele ferien på én periode. En mer balansert plan kan gi flere gode pauser gjennom året.'
+  : '';
+return {picked,left:chosen.left,totalUsed:chosen.scored.used,totalFree:chosen.scored.free,totalGained:chosen.scored.free-chosen.scored.used,eff:chosen.scored.free/Math.max(chosen.scored.used,1),holidays,errors:preferred.errors,metrics:chosen.scored.metrics,explanation,leftoverExplanation,qualityLabel:labels[chosen.strategy]||'Anbefalt plan',highConcentrationWarning};
 }
 const formatDate=d=>`${d.getDate()}. ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
 function runPlanner(){const year=Number(document.getElementById('year').value),days=Number(document.getElementById('days').value),transferDays=Number(document.getElementById('transferDays').value||0),out=document.getElementById('result');
@@ -547,6 +575,7 @@ out.innerHTML=`<section class="card"><h2>Resultat</h2><p class="reason">${res.qu
 <p class="summary-help">Effektivitet viser hvor mange kalenderdager fri du får per brukt feriedag.</p>
 ${transferText}
 ${res.errors.length?`<p class="muted">Merknad: ${res.errors.join(' ')}</p>`:''}
+${res.highConcentrationWarning?`<p class="muted">${res.highConcentrationWarning}</p>`:''}
 <p class="muted">${res.leftoverExplanation}</p>
 <p class="muted">${res.metrics.partialCount===0?'Planen unngikk delvise uker og prioriterte hele ferieuker.':'Noen delvise uker ble beholdt for å koble ferie mot helg/helligdager og fortsatt gi høy ferieeffekt.'}</p>
 <div class="legend"><span class="pill vacation">Feriedag</span><span class="pill weekend">Helg</span><span class="pill holiday">Helligdag</span><span class="pill special">Spesialdag</span></div></section>
