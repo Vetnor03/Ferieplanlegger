@@ -423,6 +423,62 @@ function plan(year,available){
     }).length;
   }
 
+  function getPeriodSignature(period){
+    const startDow=period.start.getDay();
+    const endDow=period.end.getDay();
+    const usedWeekdays=period.days.filter(d=>d.type==='vacation').map(d=>d.date.getDay());
+    const usesThuOrFri=usedWeekdays.some(d=>d===4||d===5);
+    const key=`${startDow}-${endDow}`;
+    if(key==='4-0') return 'thu-sun';
+    if(key==='5-1') return 'fri-mon';
+    if(key==='4-5') return 'thu-fri';
+    if(key==='1-2') return 'mon-tue';
+    if(usesThuOrFri && period.used<=2) return 'thu-fri-usage';
+    if(period.used<=3) return `mini-${key}`;
+    return null;
+  }
+
+  function analyzeManagerPattern(periods){
+    const sorted=[...periods].sort((a,b)=>a.start-b.start);
+    const periodCount=sorted.length;
+    const quarterCounts={Q1:0,Q2:0,Q3:0,Q4:0};
+    sorted.forEach(p=>{ const q=`Q${Math.floor(p.start.getMonth()/3)+1}`; quarterCounts[q]++; });
+    let maxConsecutiveWeeks=0;
+    let current=0;
+    let prevWeek=null;
+    sorted.forEach(p=>{
+      const ws=new Date(p.start); ws.setDate(ws.getDate()-((ws.getDay()+6)%7)); ws.setHours(0,0,0,0);
+      const weekKey=Math.floor(ws.getTime()/604800000);
+      if(prevWeek!==null && weekKey===prevWeek+1) current++; else current=1;
+      prevWeek=weekKey;
+      maxConsecutiveWeeks=Math.max(maxConsecutiveWeeks,current);
+    });
+
+    const rollingWindowCounts=[];
+    const signatureStats={};
+    let repeatedPatternCount=0;
+    let hardReject=false;
+    let repeatedMiniBreakReject=false;
+    for(let i=0;i<sorted.length;i++){
+      const start=sorted[i].start;
+      const end=addDays(start,59);
+      const inWin=sorted.filter(p=>p.start<=end && p.end>=start);
+      rollingWindowCounts.push({start:dateKey(start),count:inWin.length});
+      const local={};
+      inWin.forEach(p=>{
+        const sig=getPeriodSignature(p);
+        if(!sig) return;
+        local[sig]=(local[sig]||0)+1;
+      });
+      Object.entries(local).forEach(([sig,c])=>{
+        signatureStats[sig]=Math.max(signatureStats[sig]||0,c);
+        if(c>2) repeatedPatternCount++;
+        if(c>3) {hardReject=true; repeatedMiniBreakReject=true;}
+      });
+    }
+    return {periodCount,quarterCounts,maxConsecutiveWeeks,rollingWindowCounts,signatureStats,repeatedPatternCount,hardReject,repeatedMiniBreakReject};
+  }
+
   function scorePlan(planPeriods,strategy){
     evaluatedPlans++;
     const used=planPeriods.reduce((s,p)=>s+p.used,0);
@@ -627,8 +683,17 @@ function plan(year,available){
     score-=repeatedWorkRhythmPenalty;
     score-=staccatoPatternPenalty;
     score-=clusteringPenalty;
+    const managerPattern=analyzeManagerPattern(sorted);
+    const quarterPenalty=Object.values(managerPattern.quarterCounts).reduce((sum,c)=>sum+(c>3?(c-3)*16:0),0);
+    const tooManyPeriodsPenalty=managerPattern.periodCount>=10?(managerPattern.periodCount-9)*90:(managerPattern.periodCount>6?(managerPattern.periodCount-6)*18:0);
+    const consecutiveWeekPenalty=managerPattern.maxConsecutiveWeeks>=4?(managerPattern.maxConsecutiveWeeks-3)*120:0;
+    const repeatedPatternPenalty=Object.values(managerPattern.signatureStats).reduce((sum,c)=>sum+(c>2?(c-2)*85:0),0);
+    const rhythmFloorPenalty=shortWorkGapTransitions>0?shortWorkGapTransitions*8:0;
+    const managerApprovalPenalty=quarterPenalty+tooManyPeriodsPenalty+consecutiveWeekPenalty+repeatedPatternPenalty+rhythmFloorPenalty;
+    score-=managerApprovalPenalty;
     const hardClusterViolation=(rolling45MaxPeriods>4) || (mayMiniBreakCount>3);
-    return {score,used,free,eff,unused,fullWeeks,months,closeGapPenalty,repeatedPenalty,repeatedWorkRhythmPenalty,repeatedMiniBreakWindowPenalty,extremeMiniBreakWindowPenalty,closeGapTouched,closeGapReduced,clusterWindowPenalty,periodClusterPenalty,concentrationWindowPenalty,twoWeekMainHoliday,fullWeekCount,summerDays,rolling45MaxPeriods,mayMiniBreakCount,clusteringPenalty,hardClusterViolation,seasonBuckets,usedSeasons,dominantSeasonShare,staccatoPatternPenalty};
+    const repeatedMiniBreakRejected=managerPattern.hardReject && !planPeriods.some(p=>p.chosenWhy==='selected');
+    return {score,used,free,eff,unused,fullWeeks,months,closeGapPenalty,repeatedPenalty,repeatedWorkRhythmPenalty,repeatedMiniBreakWindowPenalty,extremeMiniBreakWindowPenalty,closeGapTouched,closeGapReduced,clusterWindowPenalty,periodClusterPenalty,concentrationWindowPenalty,twoWeekMainHoliday,fullWeekCount,summerDays,rolling45MaxPeriods,mayMiniBreakCount,clusteringPenalty,hardClusterViolation,seasonBuckets,usedSeasons,dominantSeasonShare,staccatoPatternPenalty,managerApprovalPenalty,managerPattern,repeatedMiniBreakRejected};
   }
 
   const variants=['balanced','leverage','fullWeeks','spread','summerBridges','userPriority'].map(strategy=>{
@@ -638,6 +703,7 @@ function plan(year,available){
   });
   const validVariants=variants.filter(Boolean);
   const bestOverall=[...validVariants].sort((a,b)=>{
+    if(a.repeatedMiniBreakRejected!==b.repeatedMiniBreakRejected){ return Number(a.repeatedMiniBreakRejected)-Number(b.repeatedMiniBreakRejected); }
     if(a.hardClusterViolation!==b.hardClusterViolation){
       if(a.hardClusterViolation && !b.hardClusterViolation){
         return (a.free-b.free)>=6 ? -1 : 1;
@@ -713,7 +779,13 @@ function plan(year,available){
       rolling45MaxPeriods:chosen.rolling45MaxPeriods||0,
       mayMiniBreakCount:chosen.mayMiniBreakCount||0,
       clusteringPenalty:chosen.clusteringPenalty||0,
-      hardClusterViolation:Boolean(chosen.hardClusterViolation)
+      hardClusterViolation:Boolean(chosen.hardClusterViolation),
+      managerApprovalPenalty:Number((chosen.managerApprovalPenalty||0).toFixed(2)),
+      totalSeparatePeriods:chosen.managerPattern?.periodCount||0,
+      maxConsecutiveWeeksWithVacation:chosen.managerPattern?.maxConsecutiveWeeks||0,
+      repeatedWeekdayPatternCount:chosen.managerPattern?.repeatedPatternCount||0,
+      periodsPer60DayWindow:(chosen.managerPattern?.rollingWindowCounts||[]).slice(0,8),
+      rejectedForRepeatedMiniBreaks:Boolean(chosen.repeatedMiniBreakRejected)
     });
     plannerDebug('chosen-final-score-breakdown',{
       finalScore:Number((chosen.score||0).toFixed(2)),
@@ -722,7 +794,9 @@ function plan(year,available){
       workRhythmPenalty:Number((chosen.repeatedWorkRhythmPenalty||0).toFixed(2)),
       rolling45Penalty:Number((chosen.repeatedMiniBreakWindowPenalty||0).toFixed(2)),
       extremeWindowPenalty:Number((chosen.extremeMiniBreakWindowPenalty||0).toFixed(2)),
-      concentrationWindowPenalty:Number((chosen.concentrationWindowPenalty||0).toFixed(2))
+      concentrationWindowPenalty:Number((chosen.concentrationWindowPenalty||0).toFixed(2)),
+      managerApprovalPenalty:Number((chosen.managerApprovalPenalty||0).toFixed(2)),
+      whyWinner:'best structure/manager approval balance with efficiency maintained'
     });
     const rejectedTop5=[...validVariants]
       .filter(v=>v.strategy!==chosen.strategy)
