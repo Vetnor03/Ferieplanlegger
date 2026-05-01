@@ -896,10 +896,24 @@ function plan(year,available){
   })[0];
   const chosen=bestOverall;
 
-  const picked=chosen.periods;
-  const totalUsed=chosen.used;
-  const totalFree=chosen.free;
-  const left=chosen.unused;
+  let picked=[...chosen.periods];
+  let totalUsed=chosen.used;
+  let totalFree=chosen.free;
+  let left=chosen.unused;
+  if(left>0){
+    const usedSet=new Set(picked.flatMap(p=>p.days.map(d=>dateKey(d.date))));
+    const fillers=[...candidates].filter(c=>c.used>0 && c.used<=left && !c.days.some(d=>usedSet.has(dateKey(d.date)))).sort((a,b)=> (b.efficiency-a.efficiency) || (a.used-b.used));
+    fillers.forEach(f=>{
+      if(left<=0) return;
+      if(f.used>left) return;
+      if(f.days.some(d=>usedSet.has(dateKey(d.date)))) return;
+      if(f.days.some(d=>d.type==='vacation' && dislikedDates.has(dateKey(d.date)))) return;
+      picked.push({...f,chosenWhy:'post-fill'});
+      f.days.forEach(d=>usedSet.add(dateKey(d.date)));
+      totalUsed+=f.used; totalFree+=f.total; left-=f.used;
+    });
+    picked=picked.sort((a,b)=>a.start-b.start);
+  }
   const strategyLabels={
     balanced:'Anbefalt ferieplan',
     leverage:'Smart helligdagsutnyttelse',
@@ -1199,6 +1213,8 @@ async function recalculateAroundDisliked(){
   const warning=document.getElementById('recalcWarning');
   warning.textContent='';
   await runPlanner();
+  const resultNode=document.getElementById('result');
+  if(resultNode) resultNode.scrollIntoView({behavior:'smooth',block:'start'});
   const remaining=[...dislikedDates].filter(k=>latestPlanPeriods.some(p=>p.days.some(d=>d.type==='vacation'&&dateKey(d.date)===k)));
   const planSet=new Set(latestPlanPeriods.flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>dateKey(d.date))));
   [...dislikedDates].forEach(k=>{ if(!planSet.has(k)) dislikedDates.delete(k); });
