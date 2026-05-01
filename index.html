@@ -213,6 +213,10 @@
       <label class="inline"><input id="includeSpecial" type="checkbox" checked />
         <span>Regn julaften (24.12) og nyttårsaften (31.12) som nyttige spesialdager</span>
       </label>
+      <label class="inline"><input id="avoidPeakHolidayPeriods" type="checkbox" />
+        <span>Unngå hovedferier</span>
+      </label>
+      <p class="help">Unngår typiske perioder som sommerferie, høstferie og vinterferie.</p>
 
       <button onclick="runPlanner()">Ferieplan</button>
     </div>
@@ -308,6 +312,7 @@ function plan(year,available){
   const preferred=parsePreferred(year,map);
   const minContinuousWeeks=Number(document.getElementById('minContinuousWeeks').value||0);
   const selectedPeriods=selectedDatesToPeriods(year,map);
+  const avoidPeakHolidayPeriods=document.getElementById('avoidPeakHolidayPeriods').checked;
   let evaluatedPlans=0;
   let timedOut=false;
 
@@ -477,6 +482,44 @@ function plan(year,available){
       });
     }
     return {periodCount,quarterCounts,maxConsecutiveWeeks,rollingWindowCounts,signatureStats,repeatedPatternCount,hardReject,repeatedMiniBreakReject};
+  }
+
+
+  function isoWeek(d){
+    const x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+    x.setUTCDate(x.getUTCDate()+4-(x.getUTCDay()||7));
+    const yStart=new Date(Date.UTC(x.getUTCFullYear(),0,1));
+    return Math.ceil((((x-yStart)/86400000)+1)/7);
+  }
+  function periodTouchesPeak(p){
+    return p.days.some(day=>{
+      const dt=day.date; const w=isoWeek(dt); const m=dt.getMonth();
+      if(m===6) return true; // july
+      if(w===8||w===9||w===40||w===41) return true;
+      if((m===11&&dt.getDate()>=24)||(m===0&&dt.getDate()<=3)) return true;
+      return false;
+    });
+  }
+  function validateRealLifeVacationShape(planPeriods,opts){
+    const sorted=[...planPeriods].sort((a,b)=>a.start-b.start);
+    const reasons=[];
+    const separate=sorted.length;
+    const partialWeeks=sorted.filter(p=>p.used>0&&p.used<5).length;
+    const vacDays=sorted.flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>d.date));
+    const sept1=new Date(opts.year,8,1);
+    const beforeSept=vacDays.filter(d=>d<sept1).length/Math.max(1,vacDays.length);
+    const hasMainHoliday=sorted.some(p=>p.used>=10 && p.start.getMonth()>=5 && p.start.getMonth()<=7);
+    const hasAutumnOrWinterBreak=sorted.some(p=>p.used>=3 && (p.start.getMonth()>=8 || p.start.getMonth()<=1));
+    const hasChristmasNewYearBlock=sorted.some(p=>p.start<=new Date(opts.year,11,31) && p.end>=new Date(opts.year,11,24));
+    if(opts.available>=20){
+      if(separate>6) reasons.push('too-many-periods');
+      if(separate>=10) reasons.push('extreme-period-fragmentation');
+      if(!opts.avoidPeak && !hasMainHoliday) reasons.push('missing-main-holiday');
+      if(!hasAutumnOrWinterBreak) reasons.push('missing-autumn-or-winter-break');
+      if(beforeSept>0.75) reasons.push('too-many-days-before-september');
+      if(partialWeeks>4) reasons.push('too-many-partial-weeks');
+    }
+    return {isValid:reasons.length===0,reasons,separate,hasMainHoliday,hasAutumnOrWinterBreak,hasChristmasNewYearBlock,beforeSept};
   }
 
   function scorePlan(planPeriods,strategy){
@@ -689,11 +732,17 @@ function plan(year,available){
     const consecutiveWeekPenalty=managerPattern.maxConsecutiveWeeks>=4?(managerPattern.maxConsecutiveWeeks-3)*120:0;
     const repeatedPatternPenalty=Object.values(managerPattern.signatureStats).reduce((sum,c)=>sum+(c>2?(c-2)*85:0),0);
     const rhythmFloorPenalty=shortWorkGapTransitions>0?shortWorkGapTransitions*8:0;
-    const managerApprovalPenalty=quarterPenalty+tooManyPeriodsPenalty+consecutiveWeekPenalty+repeatedPatternPenalty+rhythmFloorPenalty;
+    let peakPenalty=0;
+    if(avoidPeakHolidayPeriods){
+      peakPenalty=sorted.filter(p=>periodTouchesPeak(p)).reduce((sum,p)=>sum+(p.used>=5?120:60),0);
+    }
+    const managerApprovalPenalty=quarterPenalty+tooManyPeriodsPenalty+consecutiveWeekPenalty+repeatedPatternPenalty+rhythmFloorPenalty+peakPenalty;
     score-=managerApprovalPenalty;
     const hardClusterViolation=(rolling45MaxPeriods>4) || (mayMiniBreakCount>3);
     const repeatedMiniBreakRejected=managerPattern.hardReject && !planPeriods.some(p=>p.chosenWhy==='selected');
-    return {score,used,free,eff,unused,fullWeeks,months,closeGapPenalty,repeatedPenalty,repeatedWorkRhythmPenalty,repeatedMiniBreakWindowPenalty,extremeMiniBreakWindowPenalty,closeGapTouched,closeGapReduced,clusterWindowPenalty,periodClusterPenalty,concentrationWindowPenalty,twoWeekMainHoliday,fullWeekCount,summerDays,rolling45MaxPeriods,mayMiniBreakCount,clusteringPenalty,hardClusterViolation,seasonBuckets,usedSeasons,dominantSeasonShare,staccatoPatternPenalty,managerApprovalPenalty,managerPattern,repeatedMiniBreakRejected};
+    const shapeValidation=validateRealLifeVacationShape(planPeriods,{available,year,avoidPeak:avoidPeakHolidayPeriods});
+    if(!shapeValidation.isValid && !planPeriods.some(p=>p.chosenWhy==='selected')) score-=320*shapeValidation.reasons.length;
+    return {score,used,free,eff,unused,fullWeeks,months,closeGapPenalty,repeatedPenalty,repeatedWorkRhythmPenalty,repeatedMiniBreakWindowPenalty,extremeMiniBreakWindowPenalty,closeGapTouched,closeGapReduced,clusterWindowPenalty,periodClusterPenalty,concentrationWindowPenalty,twoWeekMainHoliday,fullWeekCount,summerDays,rolling45MaxPeriods,mayMiniBreakCount,clusteringPenalty,hardClusterViolation,seasonBuckets,usedSeasons,dominantSeasonShare,staccatoPatternPenalty,managerApprovalPenalty,managerPattern,repeatedMiniBreakRejected,shapeValidation,avoidPeakHolidayPeriods};
   }
 
   const variants=['balanced','leverage','fullWeeks','spread','summerBridges','userPriority'].map(strategy=>{
@@ -704,6 +753,7 @@ function plan(year,available){
   const validVariants=variants.filter(Boolean);
   const bestOverall=[...validVariants].sort((a,b)=>{
     if(a.repeatedMiniBreakRejected!==b.repeatedMiniBreakRejected){ return Number(a.repeatedMiniBreakRejected)-Number(b.repeatedMiniBreakRejected); }
+    if(Boolean(a.shapeValidation?.isValid)!==Boolean(b.shapeValidation?.isValid)){ return Number(Boolean(b.shapeValidation?.isValid))-Number(Boolean(a.shapeValidation?.isValid)); }
     if(a.hardClusterViolation!==b.hardClusterViolation){
       if(a.hardClusterViolation && !b.hardClusterViolation){
         return (a.free-b.free)>=6 ? -1 : 1;
@@ -785,7 +835,13 @@ function plan(year,available){
       maxConsecutiveWeeksWithVacation:chosen.managerPattern?.maxConsecutiveWeeks||0,
       repeatedWeekdayPatternCount:chosen.managerPattern?.repeatedPatternCount||0,
       periodsPer60DayWindow:(chosen.managerPattern?.rollingWindowCounts||[]).slice(0,8),
-      rejectedForRepeatedMiniBreaks:Boolean(chosen.repeatedMiniBreakRejected)
+      rejectedForRepeatedMiniBreaks:Boolean(chosen.repeatedMiniBreakRejected),
+      hasMainHoliday:Boolean(chosen.shapeValidation?.hasMainHoliday),
+      hasAutumnOrWinterBreak:Boolean(chosen.shapeValidation?.hasAutumnOrWinterBreak),
+      hasChristmasNewYearBlock:Boolean(chosen.shapeValidation?.hasChristmasNewYearBlock),
+      avoidPeakHolidayPeriods:Boolean(chosen.avoidPeakHolidayPeriods),
+      peakPeriodDaysIncluded:picked.flatMap(p=>p.days).filter(d=>periodTouchesPeak({days:[d],used:1})).length,
+      rejectedPlanReasons:chosen.shapeValidation?.reasons||[]
     });
     plannerDebug('chosen-final-score-breakdown',{
       finalScore:Number((chosen.score||0).toFixed(2)),
