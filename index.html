@@ -175,6 +175,15 @@
         </select>
       </div>
       <div>
+        <label for="efficiencyTarget">Mål for effektivitet</label>
+        <select id="efficiencyTarget">
+          <option value="na">N/A</option>
+          <option value="1">1X</option>
+          <option value="2">2X</option>
+          <option value="3">3X</option>
+        </select>
+      </div>
+      <div>
         <label for="minContinuousWeeks">Minimum sammenhengende ferieperiode</label>
         <select id="minContinuousWeeks">
           <option value="0">Ingen krav</option>
@@ -321,6 +330,8 @@ function plan(year,available){
   const {holidays,map}=holidaysNO(year,includeSpecial);
   const preferred=parsePreferred(year,map);
   const minContinuousWeeks=Number(document.getElementById('minContinuousWeeks').value||0);
+  const efficiencyTargetValue=document.getElementById('efficiencyTarget').value;
+  const efficiencyTarget=efficiencyTargetValue==='na'?null:Number(efficiencyTargetValue);
   const selectedPeriods=selectedDatesToPeriods(year,map);
   const avoidPeakHolidayPeriods=document.getElementById('avoidPeakHolidayPeriods').checked;
   const avoidedDates=new Set([...dislikedDates]);
@@ -644,6 +655,7 @@ function plan(year,available){
     const summerFullWeeks=sorted.filter(p=>p.used>=5 && p.start<=summerEnd && p.end>=summerStart).length;
     const twoWeekMainHoliday=hasTwoConsecutiveSummerWeeksFromVacationDates(vacationDays, year);
     const fullWeekCount=sorted.filter(p=>p.used>=5).length;
+    let efficiencyTargetPenalty=0;
     let closeGapPenalty=0;
     let repeatedCloseTransitions=0;
     let repeatedWorkRhythmPenalty=0;
@@ -837,6 +849,10 @@ function plan(year,available){
     score-=repeatedWorkRhythmPenalty;
     score-=staccatoPatternPenalty;
     score-=clusteringPenalty;
+    if(efficiencyTarget!==null){
+      efficiencyTargetPenalty=Math.abs(eff-efficiencyTarget)*70;
+      score-=efficiencyTargetPenalty;
+    }
     const managerPattern=analyzeManagerPattern(sorted);
     const quarterPenalty=Object.values(managerPattern.quarterCounts).reduce((sum,c)=>sum+(c>3?(c-3)*16:0),0);
     const tooManyPeriodsPenalty=managerPattern.periodCount>=10?(managerPattern.periodCount-9)*90:(managerPattern.periodCount>6?(managerPattern.periodCount-6)*18:0);
@@ -857,7 +873,7 @@ function plan(year,available){
     if(!shapeValidation.isValid && !planPeriods.some(p=>p.chosenWhy==='selected')) score-=320*shapeValidation.reasons.length;
     const totalYearScore=score;
     const rejectedReason=shapeValidation.isValid?'' : `shape:${shapeValidation.reasons.join(',')}`;
-    return {score,totalYearScore,used,free,eff,unused,fullWeeks,months,closeGapPenalty,repeatedPenalty,repeatedWorkRhythmPenalty,repeatedMiniBreakWindowPenalty,extremeMiniBreakWindowPenalty,closeGapTouched,closeGapReduced,clusterWindowPenalty,periodClusterPenalty,concentrationWindowPenalty,twoWeekMainHoliday,fullWeekCount,summerDays,rolling45MaxPeriods,mayMiniBreakCount,clusteringPenalty,hardClusterViolation,seasonBuckets,usedSeasons,dominantSeasonShare,staccatoPatternPenalty,managerApprovalPenalty,managerPattern,repeatedMiniBreakRejected,shapeValidation,avoidPeakHolidayPeriods,rejectedReason,avoidedDatesUsed,avoidedDatesPenalty};
+    return {score,totalYearScore,used,free,eff,unused,fullWeeks,months,efficiencyTargetPenalty,closeGapPenalty,repeatedPenalty,repeatedWorkRhythmPenalty,repeatedMiniBreakWindowPenalty,extremeMiniBreakWindowPenalty,closeGapTouched,closeGapReduced,clusterWindowPenalty,periodClusterPenalty,concentrationWindowPenalty,twoWeekMainHoliday,fullWeekCount,summerDays,rolling45MaxPeriods,mayMiniBreakCount,clusteringPenalty,hardClusterViolation,seasonBuckets,usedSeasons,dominantSeasonShare,staccatoPatternPenalty,managerApprovalPenalty,managerPattern,repeatedMiniBreakRejected,shapeValidation,avoidPeakHolidayPeriods,rejectedReason,avoidedDatesUsed,avoidedDatesPenalty};
   }
 
   const candidateStrategies=['balanced','leverage','fullWeeks','spread','summerBridges','userPriority','summerHeavy','autumnHeavy','christmasHeavy','managerFriendly','avoidFragmentation','earlySummer','lateSummer','fallbackTemplate'];
@@ -908,6 +924,10 @@ function plan(year,available){
       if(f.used>left) return;
       if(f.days.some(d=>usedSet.has(dateKey(d.date)))) return;
       if(f.days.some(d=>d.type==='vacation' && dislikedDates.has(dateKey(d.date)))) return;
+      if(dislikedDates.size>0){
+        const tooClose=picked.some(p=>workdaysBetween(p,f,map)<5);
+        if(tooClose) return;
+      }
       picked.push({...f,chosenWhy:'post-fill'});
       f.days.forEach(d=>usedSet.add(dateKey(d.date)));
       totalUsed+=f.used; totalFree+=f.total; left-=f.used;
@@ -1141,7 +1161,7 @@ const transferText=transferDays>0?`<p class="summary-help">${transferDays} ferie
 const {map:resultHolidayMap}=holidaysNO(year,document.getElementById('includeSpecial').checked);
 out.innerHTML=`<section class="card"><h2>Resultat</h2><p class="reason">${res.qualityLabel}</p><p class="muted">${res.explanation}</p>
 <div class="summary">${summaryCards.map(card=>`<div class="box"><strong>${card.value}</strong><span>${card.label}</span></div>`).join('')}</div>
-<p class="summary-help">Effektivitet viser hvor mange kalenderdager fri du får per brukt feriedag.</p>
+<p class="summary-help">Effektivitet viser hvor mange kalenderdager fri du får per brukt feriedag.${efficiencyTarget?` Mål: ${efficiencyTarget.toFixed(0)}X (viser nærmeste resultat).`:''}</p>
 ${transferText}
 ${res.errors.length?`<p class="muted">Merknad: ${res.errors.join(' ')}</p>`:''}
 ${res.fallbackNote?`<p class="muted">${res.fallbackNote}</p>`:''}${res.highConcentrationWarning?`<p class="muted">${res.highConcentrationWarning}</p>`:''}
@@ -1284,6 +1304,7 @@ function clearSelectedDays(){ selectedDates.clear(); renderCalendar(); }
 yearSel.addEventListener('change',()=>{pickerMonth=0; clearSelectedDays(); renderCalendar(); document.getElementById('result').innerHTML='';});
 document.getElementById('includeSpecial').addEventListener('change',()=>{renderCalendar(); document.getElementById('result').innerHTML='';});
 document.getElementById('transferDays').addEventListener('input',()=>{document.getElementById('result').innerHTML='';});
+document.getElementById('efficiencyTarget').addEventListener('change',()=>{document.getElementById('result').innerHTML='';});
 renderCalendar();
 </script>
 </body>
