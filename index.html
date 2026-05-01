@@ -891,8 +891,15 @@ function plan(year,available){
     if((v.managerPattern?.periodCount||0)>=10) return false;
     const partialCount=(v.periods||[]).filter(p=>p.used>0&&p.used<5).length;
     const closePartial=closePartialClusterScore(v.periods||[]);
+    const vacDays=(v.periods||[]).flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>d.date));
+    const juneJuly=vacDays.filter(d=>d.getMonth()===5||d.getMonth()===6).length;
+    const juneJulyShare=juneJuly/Math.max(1,vacDays.length);
+    const juneJulyRedLeverage=(v.periods||[])
+      .flatMap(p=>p.days)
+      .filter(d=>((d.date.getMonth()===5||d.date.getMonth()===6) && (d.type==='holiday'||d.type==='special'))).length;
     if(partialCount>=4) return false;
     if(closePartial>=3) return false;
+    if(vacDays.length>=20 && juneJulyShare>0.58 && juneJulyRedLeverage<2) return false;
     return true;
   }
   const byEfficiency=[...pool].sort((a,b)=>{
@@ -1003,7 +1010,7 @@ function plan(year,available){
       winnerAvoidedAllDisliked:(chosen.avoidedDatesUsed||0)===0,
       whyWinner:'best structure/manager approval balance with efficiency maintained'
     });
-    const comparisonTable=validVariants.map(v=>({candidate:v.strategy,used:v.used,calendarDaysOff:v.free,periods:v.managerPattern?.periodCount||v.periods.length,partialWeeks:(v.periods||[]).filter(p=>p.used>0&&p.used<5).length,closePartialClusters:closePartialClusterScore(v.periods||[]),hasMainHoliday:Boolean(v.shapeValidation?.hasMainHoliday),hasAutumnOrWinterBreak:Boolean(v.shapeValidation?.hasAutumnOrWinterBreak),repeatedMiniBreakPenalty:Number((v.repeatedMiniBreakWindowPenalty||0).toFixed(2)),managerApprovalScore:Number((-(v.managerApprovalPenalty||0)).toFixed(2)),totalYearScore:Number(((v.totalYearScore||v.score)||0).toFixed(2)),rejectedReason:v.rejectedReason||'',winner:v.strategy===chosen.strategy}));
+    const comparisonTable=validVariants.map(v=>{ const vacDays=(v.periods||[]).flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>d.date)); const juneJuly=vacDays.filter(d=>d.getMonth()===5||d.getMonth()===6).length; return ({candidate:v.strategy,used:v.used,calendarDaysOff:v.free,periods:v.managerPattern?.periodCount||v.periods.length,partialWeeks:(v.periods||[]).filter(p=>p.used>0&&p.used<5).length,closePartialClusters:closePartialClusterScore(v.periods||[]),juneJulyShare:Number((juneJuly/Math.max(1,vacDays.length)).toFixed(2)),hasMainHoliday:Boolean(v.shapeValidation?.hasMainHoliday),hasAutumnOrWinterBreak:Boolean(v.shapeValidation?.hasAutumnOrWinterBreak),repeatedMiniBreakPenalty:Number((v.repeatedMiniBreakWindowPenalty||0).toFixed(2)),managerApprovalScore:Number((-(v.managerApprovalPenalty||0)).toFixed(2)),totalYearScore:Number(((v.totalYearScore||v.score)||0).toFixed(2)),rejectedReason:v.rejectedReason||'',winner:v.strategy===chosen.strategy});});
     plannerDebug('candidate-comparison-table',comparisonTable);
     plannerDebug('candidate-search-summary',{totalCandidatesGenerated:variants.length,totalCandidatesRejected:validVariants.filter(v=>!v.shapeValidation?.isValid).length,totalValidCandidates:validVariants.filter(v=>v.shapeValidation?.isValid).length,finalWinner:chosen.strategy,top10:[...validVariants].sort((a,b)=>(b.totalYearScore||b.score)-(a.totalYearScore||a.score)).slice(0,10).map(v=>({strategy:v.strategy,id:v.candidateId||v.strategy,totalYearScore:Number((v.totalYearScore||v.score).toFixed(2))}))});
     const rejectedTop5=[...validVariants]
