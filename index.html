@@ -640,6 +640,7 @@ function plan(year,available){
     const summerStart=new Date(year,5,1);
     const summerEnd=new Date(year,7,31);
     const isCustomSeason=season.value==='custom';
+    const noSeasonPreference=season.value==='all';
     const summerDays=sorted.reduce((sum,p)=>sum+p.days.filter(d=>d.type==='vacation' && d.date>=summerStart && d.date<=summerEnd).length,0);
     const summerFullWeeks=sorted.filter(p=>p.used>=5 && p.start<=summerEnd && p.end>=summerStart).length;
     const twoWeekMainHoliday=hasTwoConsecutiveSummerWeeksFromVacationDates(vacationDays, year);
@@ -788,7 +789,7 @@ function plan(year,available){
     if(strategy==='lateSummer' && !sorted.some(p=>p.start.getMonth()>=7&&p.start.getMonth()<=8)) score-=30;
     if(strategy==='avoidPeakHolidays' && sorted.some(p=>periodTouchesPeak(p))) score-=200;
 
-    if(available>=20 && !isCustomSeason){
+    if(available>=20 && !isCustomSeason && season.value==='summer'){
       if(twoWeekMainHoliday) score+=24;
       else if(summerFullWeeks>=1) score+=14;
       else score-=18;
@@ -798,11 +799,15 @@ function plan(year,available){
       else if(fullWeekCount>=1) score+=8;
       else score-=20;
     }
-    if(available>=20 && summerDays<5 && !isCustomSeason) score-=28;
+    if(available>=20 && summerDays<5 && !isCustomSeason && season.value==='summer') score-=28;
     if(usedSeasons>=3) score+=28;
     if(usedSeasons===4) score+=70;
-    if(dominantSeasonShare>0.5) score-=(dominantSeasonShare-0.5)*280;
-    if(dominantSeasonShare>0.65) score-=120+(dominantSeasonShare-0.65)*420;
+    if(dominantSeasonShare>0.5) score-=(dominantSeasonShare-0.5)*(noSeasonPreference?420:280);
+    if(dominantSeasonShare>0.65) score-=(noSeasonPreference?180:120)+(dominantSeasonShare-0.65)*(noSeasonPreference?620:420);
+    if(noSeasonPreference){
+      if(usedSeasons>=3) score+=40;
+      if(usedSeasons===4) score+=50;
+    }
 
     if(available>=20){
       const autumnStart=new Date(year,8,1), autumnEnd=new Date(year,10,30);
@@ -812,7 +817,7 @@ function plan(year,available){
       else if(hasAutumnLongWeekend) score+=28;
       else score-=220;
     }
-    if(available>=20){
+    if(available>=20 && !noSeasonPreference){
       const julyStart=new Date(year,6,1);
       const usedBeforeJuly=vacationDays.filter(d=>d<julyStart).length;
       const earlyShare=usedBeforeJuly/Math.max(1,used);
