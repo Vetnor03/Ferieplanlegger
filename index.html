@@ -19,8 +19,7 @@
     label{font-weight:700;font-size:.95rem;margin-bottom:6px;display:block}
     .help{color:var(--muted);font-size:.82rem;margin-top:-2px;margin-bottom:8px;line-height:1.35}
     input,select,textarea,button{width:100%;font:inherit;padding:12px;border-radius:12px;border:1px solid #d1d5db}
-    textarea{min-height:90px;resize:vertical}
-    button{background:var(--accent);color:#fff;border:none;font-weight:750;cursor:pointer;transition:transform 120ms ease,opacity 120ms ease,background 120ms ease}
+    button{background:var(--accent);color:#fff;border:none;font-weight:750;cursor:pointer;transition:transform 120ms ease,opacity 120ms ease}
     button:active{transform:scale(.99)}
     button:disabled{opacity:.45;cursor:not-allowed}
     .ghost{background:#fff;color:var(--text);border:1px solid var(--border)}
@@ -75,6 +74,7 @@
     }
   </style>
 </head>
+
 <body>
 <main class="app">
   <section class="hero">
@@ -118,11 +118,12 @@
         <label for="minContinuousWeeks">Minimum sammenhengende ferieperiode</label>
         <select id="minContinuousWeeks">
           <option value="0">Ingen krav</option>
-          <option value="1">Minst 1 uke</option>
-          <option value="2">Minst 2 uker</option>
-          <option value="3">Minst 3 uker</option>
-          <option value="4">Minst 4 uker</option>
+          <option value="1">Minst 1 uke sammenhengende</option>
+          <option value="2">Minst 2 uker sammenhengende</option>
+          <option value="3">Minst 3 uker sammenhengende</option>
+          <option value="4">Minst 4 uker sammenhengende</option>
         </select>
+        <p class="help">Måles som kalenderdager fri. 3 uker betyr mandag til søndag tredje uke, altså 21 dager.</p>
       </div>
 
       <div class="form-cols" id="customRange" style="display:none;">
@@ -138,7 +139,7 @@
 
       <div>
         <label>Foretrukne ferieperioder</label>
-        <p class="help">Velg dager direkte i kalenderen under. Disse blir prioritert høyt i planen.</p>
+        <p class="help">Valgfritt: velg dager du allerede har bestemt deg for. Hvis du ikke velger noe, finner appen en plan selv.</p>
       </div>
 
       <section class="card" style="margin:0;">
@@ -526,9 +527,10 @@ function buildBlocks(year,maxDays,opts={}){
     if(!okDate(d)) continue;
 
     if(d.getDay()===1){
-      add(blocks,d,addDays(d,4),'Hel uke');
-      add(blocks,d,addDays(d,11),'To sammenhengende uker');
-      add(blocks,d,addDays(d,18),'Tre sammenhengende uker');
+      add(blocks,d,addDays(d,6),'Hel uke');
+      add(blocks,d,addDays(d,13),'To sammenhengende uker');
+      add(blocks,d,addDays(d,20),'Tre sammenhengende uker');
+      add(blocks,d,addDays(d,27),'Fire sammenhengende uker');
     }
 
     if(d.getDay()===4) add(blocks,d,addDays(d,3),'Torsdag–søndag');
@@ -844,8 +846,8 @@ function plan(year,available,mode='balanced'){
     }
 
     if(minContinuousWeeks>0){
-      const req=minContinuousWeeks*5;
-      score+=periods.some(p=>p.used>=req)?165:-270;
+      const req=minContinuousWeeks*7;
+      score+=periods.some(p=>p.total>=req)?165:-350;
     }
 
     score+=periods.filter(p=>p.clean).length*(mode==='efficiency'?3:14);
@@ -906,18 +908,6 @@ function plan(year,available,mode='balanced'){
     partialWeeks:chosen.partialWeeks
   });
 
-  plannerDebug('top-10-plans',scored.slice(0,10).map(p=>({
-    profile:p.profile,
-    score:Number(p.score.toFixed(2)),
-    used:p.used,
-    free:p.free,
-    eff:Number(p.eff.toFixed(2)),
-    periods:p.periodCount,
-    fullWeeks:p.fullWeeks,
-    partialWeeks:p.partialWeeks,
-    seasons:p.seasonBuckets
-  })));
-
   const picked=chosen.periods;
   const totalUsed=chosen.used;
   const totalFree=chosen.free;
@@ -945,7 +935,7 @@ function plan(year,available,mode='balanced'){
       fullCount:chosen.fullWeeks,
       partialCount:chosen.partialWeeks,
       plansEvaluated:evaluatedPlans,
-      mainHoliday:picked.some(p=>p.used>=10)
+      mainHoliday:picked.some(p=>p.total>=14)
     },
     explanation,
     leftoverExplanation:left>0
@@ -1111,7 +1101,7 @@ async function runPlanner(mode='balanced'){
           `).join('')}
         </div>
 
-        <p class="summary-help">Effektivitet viser hvor mange kalenderdager fri du får per brukt feriedag. Vanlig ferieplan velges ut fra hele ferieåret, ikke bare høyest effektivitet.</p>
+        <p class="summary-help">Dager fri totalt inkluderer feriedager, helger, helligdager og spesialdager inne i ferieperiodene. Effektivitet viser kalenderdager fri per brukt feriedag.</p>
         ${transferText}
         ${res.fallbackNote?`<p class="muted">${res.fallbackNote}</p>`:''}
         ${res.highConcentrationWarning?`<p class="muted">${res.highConcentrationWarning}</p>`:''}
@@ -1130,7 +1120,7 @@ async function runPlanner(mode='balanced'){
         <section class="card period">
           <h2>${i+1}. ${formatDate(p.start)} – ${formatDate(p.end)}</h2>
           <span class="reason">${p.reason}</span>
-          <p class="muted">${p.used} feriedager brukt • ${p.total} dager fri • ${p.gained} ekstra dager • ${(p.efficiency||p.total/Math.max(1,p.used)).toFixed(2)}x</p>
+          <p class="muted">${p.used} feriedager brukt • ${p.total} kalenderdager fri • ${p.gained} ekstra dager • ${(p.efficiency||p.total/Math.max(1,p.used)).toFixed(2)}x</p>
           <div class="timeline">
             ${p.days.map(d=>{
               const c=getResultDayClass(d.date,res.picked,resultHolidayMap);
@@ -1194,14 +1184,14 @@ function renderBridgeOverview(year){
         <div class="box"><strong>${bridges.filter(b=>b.used<=2).length}</strong><span>1–2 feriedager</span></div>
       </div>
 
-      <p class="summary-help">Sortert kronologisk. Effektivitet = kalenderdager fri delt på feriedager brukt.</p>
+      <p class="summary-help">Sortert kronologisk. Dager fri inkluderer feriedager, helger, helligdager og spesialdager i perioden. Effektivitet = kalenderdager fri delt på feriedager brukt.</p>
     </section>
 
     ${bridges.map((p,i)=>`
       <section class="card period">
         <h2>${i+1}. ${formatDate(p.start)} – ${formatDate(p.end)}</h2>
         <span class="reason">${p.reason}</span>
-        <p class="muted">Krever ${p.used} feriedag(er) • gir ${p.total} dager fri • ${p.gained} ekstra dager • ${p.efficiency.toFixed(2)}x</p>
+        <p class="muted">Krever ${p.used} feriedag(er) • gir ${p.total} kalenderdager fri • ${p.gained} ekstra dager • ${p.efficiency.toFixed(2)}x</p>
         <div class="timeline">
           ${p.days.map(d=>`
             <span class="pill ${d.type==='vacation'?'vacation':d.type==='weekend'?'weekend':d.type==='special'?'special':'holiday'}">
