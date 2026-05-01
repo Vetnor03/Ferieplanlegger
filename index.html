@@ -94,6 +94,7 @@
     .calendar-day.selected:not(.weekend):not(.holiday):not(.special) { background: var(--selected); color: var(--vac-strong); }
     .calendar-day.result-vacation-used { background: var(--selected); color: var(--vac-strong); }
     .calendar-day.result-vacation-connected-weekend { background: var(--selected); color: var(--vac-strong); }
+    .calendar-day.disliked { background:#fee2e2 !important; color:#991b1b !important; outline:2px solid #ef4444; outline-offset:-2px; }
     .calendar-day small { display:block; color: var(--muted); font-size:0.7rem; }
     .weekday-head { text-align:center; color: var(--muted); font-size:0.75rem; margin-bottom:4px; }
     .calendar-actions { display:flex; gap:8px; flex-wrap: wrap; }
@@ -223,6 +224,12 @@
   </section>
 
   <section id="result"></section>
+<section class="card" id="recalcCard" style="display:none;">
+  <h2>Beregn på nytt</h2>
+  <p class="muted">Marker dager du ikke ønsker, og beregn på nytt.</p>
+  <button id="recalculateBtn" type="button" disabled onclick="recalculateAroundDisliked()">Beregn på nytt</button>
+  <p id="recalcWarning" class="muted" style="margin-top:8px;"></p>
+</section>
 </main>
 <div id="loadingOverlay" class="loading-overlay" aria-live="polite" aria-hidden="true">
   <div class="loading-card">
@@ -240,6 +247,9 @@ const today = new Date();
 today.setHours(0,0,0,0);
 const dateKey=d=>d.toISOString().slice(0,10); const addDays=(d,n)=>{const x=new Date(d); x.setDate(x.getDate()+n); return x;}; const isWeekend=d=>d.getDay()===0||d.getDay()===6;
 const selectedDates = new Set();
+const dislikedDates = new Set();
+let latestPlanPeriods = [];
+let latestPlanYear = null;
 const DEBUG_PLANNER = false;
 const DEBUG_CALENDAR = false;
 const DEBUG_LOADING = false;
@@ -313,6 +323,7 @@ function plan(year,available){
   const minContinuousWeeks=Number(document.getElementById('minContinuousWeeks').value||0);
   const selectedPeriods=selectedDatesToPeriods(year,map);
   const avoidPeakHolidayPeriods=document.getElementById('avoidPeakHolidayPeriods').checked;
+  const avoidedDates=new Set([...dislikedDates]);
   let evaluatedPlans=0;
   let timedOut=false;
 
@@ -330,7 +341,10 @@ function plan(year,available){
     const startDow=p.start.getDay(); const endDow=p.end.getDay();
     return (startDow===1||startDow===5||startDow===6) && (endDow===0||endDow===5||endDow===6);
   }
-  function fitsPeriod(p){ return p.used>0 && p.used<=available && inFilter(p.start,year) && inFilter(p.end,year); }
+  function fitsPeriod(p){ if(!(p.used>0 && p.used<=available && inFilter(p.start,year) && inFilter(p.end,year))) return false;
+    const hasBlocked=p.days.some(d=>d.type==='vacation' && avoidedDates.has(dateKey(d.date)));
+    return !hasBlocked;
+  }
   function addCandidate(list,start,end,reason,kind='bridge'){
     if(list.length>=PLANNER_LIMITS.maxCandidatePeriods||outOfTime()) return;
     const p=evaluatePeriod(start,end,map,reason);
@@ -825,7 +839,9 @@ function plan(year,available){
     if(avoidPeakHolidayPeriods){
       peakPenalty=sorted.filter(p=>periodTouchesPeak(p)).reduce((sum,p)=>sum+(p.used>=5?120:60),0);
     }
-    const managerApprovalPenalty=quarterPenalty+tooManyPeriodsPenalty+consecutiveWeekPenalty+repeatedPatternPenalty+rhythmFloorPenalty+peakPenalty;
+    const avoidedDatesUsed=sorted.flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>dateKey(d.date))).filter(k=>avoidedDates.has(k)).length;
+    const avoidedDatesPenalty=avoidedDatesUsed*500;
+    const managerApprovalPenalty=quarterPenalty+tooManyPeriodsPenalty+consecutiveWeekPenalty+repeatedPatternPenalty+rhythmFloorPenalty+peakPenalty+avoidedDatesPenalty;
     score-=managerApprovalPenalty;
     const hardClusterViolation=(rolling45MaxPeriods>4) || (mayMiniBreakCount>3);
     const repeatedMiniBreakRejected=managerPattern.hardReject && !planPeriods.some(p=>p.chosenWhy==='selected');
@@ -833,7 +849,7 @@ function plan(year,available){
     if(!shapeValidation.isValid && !planPeriods.some(p=>p.chosenWhy==='selected')) score-=320*shapeValidation.reasons.length;
     const totalYearScore=score;
     const rejectedReason=shapeValidation.isValid?'' : `shape:${shapeValidation.reasons.join(',')}`;
-    return {score,totalYearScore,used,free,eff,unused,fullWeeks,months,closeGapPenalty,repeatedPenalty,repeatedWorkRhythmPenalty,repeatedMiniBreakWindowPenalty,extremeMiniBreakWindowPenalty,closeGapTouched,closeGapReduced,clusterWindowPenalty,periodClusterPenalty,concentrationWindowPenalty,twoWeekMainHoliday,fullWeekCount,summerDays,rolling45MaxPeriods,mayMiniBreakCount,clusteringPenalty,hardClusterViolation,seasonBuckets,usedSeasons,dominantSeasonShare,staccatoPatternPenalty,managerApprovalPenalty,managerPattern,repeatedMiniBreakRejected,shapeValidation,avoidPeakHolidayPeriods,rejectedReason};
+    return {score,totalYearScore,used,free,eff,unused,fullWeeks,months,closeGapPenalty,repeatedPenalty,repeatedWorkRhythmPenalty,repeatedMiniBreakWindowPenalty,extremeMiniBreakWindowPenalty,closeGapTouched,closeGapReduced,clusterWindowPenalty,periodClusterPenalty,concentrationWindowPenalty,twoWeekMainHoliday,fullWeekCount,summerDays,rolling45MaxPeriods,mayMiniBreakCount,clusteringPenalty,hardClusterViolation,seasonBuckets,usedSeasons,dominantSeasonShare,staccatoPatternPenalty,managerApprovalPenalty,managerPattern,repeatedMiniBreakRejected,shapeValidation,avoidPeakHolidayPeriods,rejectedReason,avoidedDatesUsed,avoidedDatesPenalty};
   }
 
   const candidateStrategies=['balanced','leverage','fullWeeks','spread','summerBridges','userPriority','summerHeavy','autumnHeavy','christmasHeavy','managerFriendly','avoidFragmentation','earlySummer','lateSummer','fallbackTemplate'];
@@ -949,6 +965,10 @@ function plan(year,available){
       extremeWindowPenalty:Number((chosen.extremeMiniBreakWindowPenalty||0).toFixed(2)),
       concentrationWindowPenalty:Number((chosen.concentrationWindowPenalty||0).toFixed(2)),
       managerApprovalPenalty:Number((chosen.managerApprovalPenalty||0).toFixed(2)),
+      avoidedDatesCount:avoidedDates.size,
+      avoidedDatesUsed:chosen.avoidedDatesUsed||0,
+      avoidedDatesPenalty:chosen.avoidedDatesPenalty||0,
+      winnerAvoidedAllDisliked:(chosen.avoidedDatesUsed||0)===0,
       whyWinner:'best structure/manager approval balance with efficiency maintained'
     });
     const comparisonTable=validVariants.map(v=>({candidate:v.strategy,used:v.used,calendarDaysOff:v.free,periods:v.managerPattern?.periodCount||v.periods.length,hasMainHoliday:Boolean(v.shapeValidation?.hasMainHoliday),hasAutumnOrWinterBreak:Boolean(v.shapeValidation?.hasAutumnOrWinterBreak),repeatedMiniBreakPenalty:Number((v.repeatedMiniBreakWindowPenalty||0).toFixed(2)),managerApprovalScore:Number((-(v.managerApprovalPenalty||0)).toFixed(2)),totalYearScore:Number(((v.totalYearScore||v.score)||0).toFixed(2)),rejectedReason:v.rejectedReason||'',winner:v.strategy===chosen.strategy}));
@@ -1108,7 +1128,9 @@ ${res.fallbackNote?`<p class="muted">${res.fallbackNote}</p>`:''}${res.highConce
 <div class="legend"><span class="pill vacation">Feriedag</span><span class="pill weekend">Helg</span><span class="pill holiday">Helligdag</span><span class="pill special">Spesialdag</span></div></section>
 ${res.picked.map((p,i)=>`<section class="card period"><h2>${i+1}. ${formatDate(p.start)} – ${formatDate(p.end)}</h2><span class="reason">${p.reason}</span><p class="muted">${p.used} feriedager brukt • ${p.total} dager fri • ${p.gained} ekstra dager</p><div class="timeline">${p.days.map(d=>{const c=getResultDayClass(d.date,res.picked,resultHolidayMap);const pill=(c==='vacation-used'||c==='vacation-connected-weekend')?'vacation':(c==='normal-weekend'?'weekend':(c==='special-day'?'special':(c==='holiday'?'holiday':'')));return `<span class="pill ${pill}">${dayNames[d.date.getDay()]} ${d.date.getDate()}. ${monthNames[d.date.getMonth()]}</span>`;}).join('')}</div></section>`).join('')}
 <section class="card"><h2>Norske helligdager ${year}</h2>${res.holidays.sort((a,b)=>a.date-b.date).map(h=>`<div class="holiday-row"><strong>${formatDate(h.date)}</strong><span>${h.name}</span></div>`).join('')}</section>`;
+latestPlanPeriods=res.picked; latestPlanYear=year;
 renderResultCalendar(year, res.picked);
+updateRecalculateUi();
 } catch(err){
   console.error(err);
   plannerDebug('runPlanner error',err);
@@ -1136,12 +1158,41 @@ function renderResultCalendar(year, planPeriods){
       else if(visualClass==='special-day') cls.push('special');
       else if(visualClass==='normal-weekend') cls.push('weekend');
       else cls.push('normal-day');
-      body += `<div class="${cls.join(' ')}">${day}</div>`;
+      const k=dateKey(d);
+      if(dislikedDates.has(k) && (visualClass==='vacation-used'||visualClass==='vacation-connected-weekend')) cls.push('disliked');
+      const clickable=(visualClass==='vacation-used'||visualClass==='vacation-connected-weekend');
+      body += clickable ? `<button type="button" class="${cls.join(' ')}" onclick="toggleDislikedDate('${k}')">${day}</button>` : `<div class="${cls.join(' ')}">${day}</div>`;
     }
     body+='</div>';
     return `<section class="card" style="margin-bottom:8px;"><h3 style="margin:0 0 8px;">${monthNames[month]} ${year}</h3>${body}</section>`;
   }).join('');
   document.getElementById('result').innerHTML += `<section class="card"><h2>Kalenderoversikt for resultat</h2><p class="muted">Markerte dager viser hele planen din i kalenderformat.</p>${html}</section>`;
+}
+
+
+function toggleDislikedDate(key){
+  if(dislikedDates.has(key)) dislikedDates.delete(key); else dislikedDates.add(key);
+  if(latestPlanYear!==null) renderResultCalendar(latestPlanYear, latestPlanPeriods);
+  updateRecalculateUi();
+}
+function updateRecalculateUi(){
+  const card=document.getElementById('recalcCard');
+  const btn=document.getElementById('recalculateBtn');
+  if(!card||!btn) return;
+  const activeDisliked=[...dislikedDates].filter(k=>latestPlanPeriods.some(p=>p.days.some(d=>d.type==='vacation'&&dateKey(d.date)===k)));
+  card.style.display=latestPlanPeriods.length?'block':'none';
+  btn.disabled=activeDisliked.length===0;
+}
+async function recalculateAroundDisliked(){
+  const warning=document.getElementById('recalcWarning');
+  warning.textContent='';
+  await runPlanner();
+  const remaining=[...dislikedDates].filter(k=>latestPlanPeriods.some(p=>p.days.some(d=>d.type==='vacation'&&dateKey(d.date)===k)));
+  const planSet=new Set(latestPlanPeriods.flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>dateKey(d.date))));
+  [...dislikedDates].forEach(k=>{ if(!planSet.has(k)) dislikedDates.delete(k); });
+  if(remaining.length){ warning.textContent='Noen unngåtte dager ble beholdt fordi vi ikke fant en bedre gyldig plan.'; }
+  if(latestPlanYear!==null) renderResultCalendar(latestPlanYear, latestPlanPeriods);
+  updateRecalculateUi();
 }
 
 function renderCalendar(){
