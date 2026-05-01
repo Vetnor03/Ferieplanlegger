@@ -379,6 +379,77 @@ function plan(year,available){
   const premiumCandidates=candidates.filter(c=>c.efficiency>=2.2 && c.used<=Math.max(6,Math.floor(available*0.35)));
   const mustConsider=candidates.filter(c=>c.efficiency>=2.8 || (c.efficiency>=2.2 && c.redDayLeverage>=1));
 
+  function createCustomPeriod(start,end,reason,type='bridge',chosenWhy='generated'){
+    const p=evaluatePeriod(start,end,map,reason);
+    if(!fitsPeriod(p)) return null;
+    p.type=type; p.efficiency=p.total/Math.max(1,p.used); p.quality=efficiencyBand(p.efficiency); p.clean=cleanStructure(p);
+    p.redDayLeverage=p.days.filter(d=>d.type==='holiday'||d.type==='special').length;
+    p.id=`gen_${type}_${dateKey(start)}_${dateKey(end)}_${reason}`;
+    p.chosenWhy=chosenWhy;
+    return p;
+  }
+  function buildFromBlocks(blocks){
+    const periods=[]; const usedDates=new Set(); let used=0;
+    for(const b of blocks){
+      const p=createCustomPeriod(b.start,b.end,b.reason,b.type||'bridge','generated');
+      if(!p) continue;
+      if(p.days.some(d=>usedDates.has(dateKey(d.date)))) continue;
+      if(used+p.used>available) continue;
+      periods.push(p); p.days.forEach(d=>usedDates.add(dateKey(d.date))); used+=p.used;
+    }
+    return periods.sort((a,b)=>a.start-b.start);
+  }
+  function generateStructuredCandidates(){
+    const yearEnd=new Date(year,11,31);
+    const springOpts=[
+      {start:addDays(easter,-4),end:addDays(easter,1),reason:'Påske 4+10',type:'easter'},
+      {start:addDays(ascension,-1),end:addDays(ascension,3),reason:'Kristi himmelfart bro',type:'bridge'},
+      {start:new Date(year,3,30),end:new Date(year,4,3),reason:'1. mai langhelg',type:'longWeekend'}
+    ];
+    const mayOpts=[
+      [],
+      [{start:addDays(ascension,-1),end:addDays(ascension,3),reason:'Mai bro 1',type:'bridge'}],
+      [{start:addDays(ascension,-1),end:addDays(ascension,3),reason:'Mai bro 1',type:'bridge'},{start:new Date(year,4,15),end:new Date(year,4,18),reason:'17. mai langhelg',type:'longWeekend'}]
+    ];
+    const summerStarts=[new Date(year,5,22),new Date(year,5,29),new Date(year,6,6),new Date(year,6,13),new Date(year,6,20),new Date(year,6,27),new Date(year,7,3)];
+    const summerLens=[4,11,18];
+    const autumnOpts=[
+      {start:new Date(year,9,5),end:new Date(year,9,11),reason:'Høstuke',type:'fullWeek'},
+      {start:new Date(year,9,12),end:new Date(year,9,18),reason:'Høstuke sen',type:'fullWeek'},
+      {start:new Date(year,10,2),end:new Date(year,10,8),reason:'Novemberuke',type:'fullWeek'},
+      null
+    ];
+    const xmasOpts=[
+      {start:new Date(year,11,24),end:new Date(year+1,0,3),reason:'Jul/nyttår lang',type:'christmas'},
+      {start:new Date(year,11,24),end:new Date(year,11,31),reason:'Jul/nyttår kort',type:'christmas'},
+      null
+    ];
+    const extras=[null,{start:addDays(pentecost,-3),end:addDays(pentecost,0),reason:'Pinsebro',type:'bridge'}];
+    const out=[]; let id=0;
+    for(const sp of springOpts){
+      for(const mo of mayOpts){
+        for(const ss of summerStarts){
+          for(const len of summerLens){
+            for(const au of autumnOpts){
+              for(const xm of xmasOpts){
+                for(const ex of extras){
+                  const blocks=[sp,...mo,{start:ss,end:addDays(ss,len),reason:len>=11?'Sommer hovedferie':'Sommeruke',type:'summerBlock'}];
+                  if(au) blocks.push(au); if(xm) blocks.push(xm); if(ex) blocks.push(ex);
+                  if(avoidPeakHolidayPeriods && blocks.some(b=>b && b.start.getMonth()===6)) continue;
+                  const periods=buildFromBlocks(blocks.filter(Boolean));
+                  if(periods.length===0) continue;
+                  out.push({strategy:'searchGrid',candidateId:`grid_${id++}`,periods});
+                  if(out.length>=220) return out;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return out;
+  }
+
   function buildPlan(strategy){
     const usedDates=new Set(); const periods=[]; let used=0;
     function pushCandidate(c,why){
@@ -767,11 +838,13 @@ function plan(year,available){
 
   const candidateStrategies=['balanced','leverage','fullWeeks','spread','summerBridges','userPriority','summerHeavy','autumnHeavy','christmasHeavy','managerFriendly','avoidFragmentation','earlySummer','lateSummer','fallbackTemplate'];
   if(avoidPeakHolidayPeriods) candidateStrategies.push('avoidPeakHolidays');
-  const variants=candidateStrategies.map(strategy=>{
+  const strategyVariants=candidateStrategies.map(strategy=>{
     if(outOfTime()) return null;
     const periods=buildPlan(strategy);
     return {strategy,periods,...scorePlan(periods,strategy)};
   });
+  const generatedGrid=generateStructuredCandidates().map(v=>({strategy:v.strategy,candidateId:v.candidateId,periods:v.periods,...scorePlan(v.periods,v.strategy)}));
+  const variants=[...strategyVariants.filter(Boolean),...generatedGrid];
   const validVariants=variants.filter(Boolean);
   const shapeValidCandidates=validVariants.filter(v=>v.shapeValidation?.isValid);
   const pool=(shapeValidCandidates.length?shapeValidCandidates:validVariants);
@@ -880,6 +953,7 @@ function plan(year,available){
     });
     const comparisonTable=validVariants.map(v=>({candidate:v.strategy,used:v.used,calendarDaysOff:v.free,periods:v.managerPattern?.periodCount||v.periods.length,hasMainHoliday:Boolean(v.shapeValidation?.hasMainHoliday),hasAutumnOrWinterBreak:Boolean(v.shapeValidation?.hasAutumnOrWinterBreak),repeatedMiniBreakPenalty:Number((v.repeatedMiniBreakWindowPenalty||0).toFixed(2)),managerApprovalScore:Number((-(v.managerApprovalPenalty||0)).toFixed(2)),totalYearScore:Number(((v.totalYearScore||v.score)||0).toFixed(2)),rejectedReason:v.rejectedReason||'',winner:v.strategy===chosen.strategy}));
     plannerDebug('candidate-comparison-table',comparisonTable);
+    plannerDebug('candidate-search-summary',{totalCandidatesGenerated:variants.length,totalCandidatesRejected:validVariants.filter(v=>!v.shapeValidation?.isValid).length,totalValidCandidates:validVariants.filter(v=>v.shapeValidation?.isValid).length,finalWinner:chosen.strategy,top10:[...validVariants].sort((a,b)=>(b.totalYearScore||b.score)-(a.totalYearScore||a.score)).slice(0,10).map(v=>({strategy:v.strategy,id:v.candidateId||v.strategy,totalYearScore:Number((v.totalYearScore||v.score).toFixed(2))}))});
     const rejectedTop5=[...validVariants]
       .filter(v=>v.strategy!==chosen.strategy)
       .sort((a,b)=>b.score-a.score)
