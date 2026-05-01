@@ -5,136 +5,73 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Ferieplan</title>
   <style>
-    :root {
-      --bg: #f3f4f6;
-      --card: #ffffff;
-      --text: #111827;
-      --muted: #6b7280;
-      --accent: #111827;
-      --vac: #bbf7d0;
-      --vac-strong: #166534;
-      --weekend: #e5e7eb;
-      --weekend-strong: #4b5563;
-      --holiday: #ede9fe;
-      --holiday-strong: #5b21b6;
-      --special: #fee2e2;
-      --special-strong: #be123c;
-      --border: #e5e7eb;
-      --selected: #86efac;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      color: var(--text);
-      background: var(--bg);
-    }
-    .app {
-      max-width: 980px;
-      margin: 0 auto;
-      padding: 18px 16px calc(120px + env(safe-area-inset-bottom));
-    }
-    h1 { font-size: 2rem; margin: 0 0 8px; letter-spacing: -0.02em; }
-    h2 { margin: 0 0 10px; font-size: 1.2rem; }
-    .subtitle { color: var(--muted); margin-top: 0; }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 16px;
-      margin-bottom: 14px;
-      box-shadow: 0 8px 24px rgba(17,24,39,0.05);
-    }
-    .hero { margin-bottom: 16px; }
-    .grid { display: grid; gap: 10px; }
-    label { font-weight: 700; font-size: 0.95rem; margin-bottom: 6px; display: block; }
-    .help { color: var(--muted); font-size: 0.82rem; margin-top: -2px; margin-bottom: 8px; }
-    input, select, textarea, button { width: 100%; font: inherit; padding: 12px; border-radius: 12px; border: 1px solid #d1d5db; }
-    textarea { min-height: 90px; resize: vertical; }
-    button { background: var(--accent); color: white; border: none; font-weight: 700; }
-    .inline { display: flex; align-items: start; gap: 10px; }
-    .inline input { width: auto; margin-top: 2px; }
-    .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .box { background: #f9fafb; border-radius: 14px; padding: 12px; border: 1px solid #e7eaf0; min-height: 88px; display:flex; flex-direction:column; justify-content:space-between; }
-    .box strong { font-size: 1.45rem; display:block; line-height:1.1; letter-spacing:-0.01em; }
-    .box span { color: var(--muted); font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
-    .summary-help { margin: 10px 0 0; font-size: 0.86rem; color: var(--muted); }
-    .period { border-left: 4px solid #111827; position: relative; }
-    .card-delete { position:absolute; top:12px; right:12px; width:auto; border:none; background:transparent; color:var(--muted); font-size:1.05rem; line-height:1; padding:6px; border-radius:8px; cursor:pointer; }
-    .card-delete:hover { background:#f3f4f6; color:#111827; }
-    .reason { font-size: 0.85rem; color: var(--vac-strong); background: #ecfdf5; padding: 6px 10px; border-radius: 999px; display: inline-block; }
-    .timeline { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-    .pill { padding: 5px 8px; border-radius: 999px; font-size: 0.75rem; }
-    .vacation { background: var(--vac); }
-    .weekend { background: var(--weekend); }
-    .holiday { background: var(--holiday); }
-    .special { background: var(--special); }
-    .legend { display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.8rem; color: var(--muted); }
-    .holiday-row { display:flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
-    .muted { color: var(--muted); font-size: 0.9rem; }
-    .calendar-header { display:flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .calendar-grid { display:grid; grid-template-columns: repeat(7,1fr); gap:4px; }
-    .calendar-day {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 8px 4px;
-      text-align: center;
-      background: white;
-      cursor: pointer;
-      min-height: 44px;
-      font-size: 0.9rem;
-      font-weight: 700;
-      color: #1f2937;
-    }
-    .calendar-day.empty { visibility: hidden; cursor: default; }
-    .calendar-day.weekend { background: var(--weekend); color: var(--weekend-strong); }
-    .calendar-day.holiday { background: var(--holiday); color: var(--holiday-strong); }
-    .calendar-day.special { background: var(--special); color: var(--special-strong); }
-    .calendar-day.selected { outline: 2px solid #16a34a; outline-offset: -2px; }
-    .calendar-day.selected:not(.weekend):not(.holiday):not(.special) { background: var(--selected); color: var(--vac-strong); }
-    .calendar-day.result-vacation-used { background: var(--selected); color: var(--vac-strong); }
-    .calendar-day.result-vacation-connected-weekend { background: var(--selected); color: var(--vac-strong); }
-    .calendar-day.disliked { background:#fee2e2 !important; color:#991b1b !important; outline:2px solid #ef4444; outline-offset:-2px; }
-    .calendar-day small { display:block; color: var(--muted); font-size:0.7rem; }
-    .weekday-head { text-align:center; color: var(--muted); font-size:0.75rem; margin-bottom:4px; }
-    .calendar-actions { display:flex; gap:8px; flex-wrap: wrap; }
-    .calendar-actions button { width:auto; padding:8px 12px; border-radius:10px; }
-    .calendar-actions .ghost { background:#fff; color:var(--text); border:1px solid var(--border); }
-    .month-nav { display:flex; align-items:center; justify-content:space-between; gap:8px; margin: 8px 0; }
-    .month-nav button { width:auto; padding:8px 12px; border-radius:10px; }
-    .month-label { font-weight:700; text-transform: capitalize; }
-    .loading-overlay {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(243, 244, 246, 0.6);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 150ms ease;
-      z-index: 30;
-    }
-    .loading-overlay.visible { opacity: 1; pointer-events: auto; }
-    .loading-card {
-      background: rgba(255,255,255,0.92);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 12px 16px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      color: var(--muted);
-      font-weight: 600;
-      box-shadow: 0 8px 24px rgba(17,24,39,0.09);
-      backdrop-filter: blur(2px);
-    }
-    .spinner { width:16px; height:16px; border:2px solid #c4b5fd; border-top-color:#4f46e5; border-right-color:#7c3aed; border-radius:50%; animation:spin .7s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    @media (min-width: 740px) {
-      .app { padding: 26px 22px calc(36px + env(safe-area-inset-bottom)); }
-      .summary { grid-template-columns: repeat(4, minmax(0,1fr)); }
-      .form-cols { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    :root{--bg:#f3f4f6;--card:#fff;--text:#111827;--muted:#6b7280;--accent:#111827;--vac:#bbf7d0;--vac-strong:#166534;--weekend:#e5e7eb;--weekend-strong:#4b5563;--holiday:#ede9fe;--holiday-strong:#5b21b6;--special:#fee2e2;--special-strong:#be123c;--border:#e5e7eb;--selected:#86efac;--danger:#ef4444;--danger-bg:#fee2e2}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--text);background:radial-gradient(circle at top left,rgba(255,255,255,.9),transparent 38rem),var(--bg)}
+    .app{max-width:980px;margin:0 auto;padding:18px 16px calc(120px + env(safe-area-inset-bottom))}
+    h1{font-size:2rem;margin:0 0 8px;letter-spacing:-.03em}
+    h2{margin:0 0 10px;font-size:1.16rem;letter-spacing:-.01em}
+    h3{margin:0 0 8px;font-size:1rem;text-transform:capitalize}
+    .subtitle{color:var(--muted);margin:0;line-height:1.45}
+    .hero{margin-bottom:16px;padding:8px 2px 2px}
+    .card{background:rgba(255,255,255,.94);border:1px solid var(--border);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 8px 24px rgba(17,24,39,.05);backdrop-filter:blur(4px)}
+    .grid{display:grid;gap:10px}
+    label{font-weight:700;font-size:.95rem;margin-bottom:6px;display:block}
+    .help{color:var(--muted);font-size:.82rem;margin-top:-2px;margin-bottom:8px;line-height:1.35}
+    input,select,textarea,button{width:100%;font:inherit;padding:12px;border-radius:12px;border:1px solid #d1d5db}
+    textarea{min-height:90px;resize:vertical}
+    button{background:var(--accent);color:#fff;border:none;font-weight:750;cursor:pointer;transition:transform 120ms ease,opacity 120ms ease,background 120ms ease}
+    button:active{transform:scale(.99)}
+    button:disabled{opacity:.45;cursor:not-allowed}
+    .ghost{background:#fff;color:var(--text);border:1px solid var(--border)}
+    .secondary{background:#fff;color:var(--text);border:1px solid #cbd5e1}
+    .inline{display:flex;align-items:start;gap:10px}
+    .inline input{width:auto;margin-top:2px;flex:0 0 auto}
+    .button-row{display:grid;grid-template-columns:1fr;gap:8px}
+    .summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+    .box{background:#f9fafb;border-radius:14px;padding:12px;border:1px solid #e7eaf0;min-height:88px;display:flex;flex-direction:column;justify-content:space-between}
+    .box strong{font-size:1.45rem;display:block;line-height:1.1;letter-spacing:-.02em}
+    .box span{color:var(--muted);font-size:.82rem;font-weight:650;white-space:nowrap}
+    .summary-help{margin:10px 0 0;font-size:.86rem;color:var(--muted);line-height:1.4}
+    .period{border-left:4px solid #111827;position:relative}
+    .reason{font-size:.85rem;color:var(--vac-strong);background:#ecfdf5;padding:6px 10px;border-radius:999px;display:inline-block;font-weight:700}
+    .timeline{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+    .pill{padding:5px 8px;border-radius:999px;font-size:.75rem;font-weight:650}
+    .vacation{background:var(--vac);color:var(--vac-strong)}
+    .weekend{background:var(--weekend);color:var(--weekend-strong)}
+    .holiday{background:var(--holiday);color:var(--holiday-strong)}
+    .special{background:var(--special);color:var(--special-strong)}
+    .legend{display:flex;flex-wrap:wrap;gap:8px;font-size:.8rem;color:var(--muted);margin-top:12px}
+    .holiday-row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #f3f4f6}
+    .holiday-row:last-child{border-bottom:none}
+    .muted{color:var(--muted);font-size:.9rem;line-height:1.45}
+    .calendar-header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+    .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+    .calendar-day{border:1px solid var(--border);border-radius:10px;padding:8px 4px;text-align:center;background:#fff;cursor:pointer;min-height:44px;font-size:.9rem;font-weight:750;color:#1f2937}
+    .calendar-day.empty{visibility:hidden;cursor:default}
+    .calendar-day.weekend{background:var(--weekend);color:var(--weekend-strong)}
+    .calendar-day.holiday{background:var(--holiday);color:var(--holiday-strong)}
+    .calendar-day.special{background:var(--special);color:var(--special-strong)}
+    .calendar-day.selected{outline:2px solid #16a34a;outline-offset:-2px;background:var(--selected);color:var(--vac-strong)}
+    .calendar-day.result-vacation-used,.calendar-day.result-vacation-connected-weekend{background:var(--selected);color:var(--vac-strong)}
+    .calendar-day.disliked{background:var(--danger-bg)!important;color:#991b1b!important;outline:2px solid var(--danger);outline-offset:-2px}
+    .weekday-head{text-align:center;color:var(--muted);font-size:.75rem;margin-bottom:4px;font-weight:700}
+    .calendar-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .calendar-actions button,.month-nav button{width:auto;padding:8px 12px;border-radius:10px}
+    .month-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0}
+    .month-label{font-weight:800;text-transform:capitalize}
+    .result-calendar-grid{display:grid;grid-template-columns:1fr;gap:8px}
+    .loading-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(243,244,246,.62);opacity:0;pointer-events:none;transition:opacity 150ms ease;z-index:30}
+    .loading-overlay.visible{opacity:1;pointer-events:auto}
+    .loading-card{background:rgba(255,255,255,.94);border:1px solid var(--border);border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:10px;color:var(--muted);font-weight:700;box-shadow:0 8px 24px rgba(17,24,39,.09);backdrop-filter:blur(2px)}
+    .spinner{width:16px;height:16px;border:2px solid #d1d5db;border-top-color:#111827;border-radius:50%;animation:spin .7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @media (min-width:740px){
+      .app{padding:26px 22px calc(36px + env(safe-area-inset-bottom))}
+      .summary{grid-template-columns:repeat(4,minmax(0,1fr))}
+      .form-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+      .button-row{grid-template-columns:1fr 1fr}
+      .result-calendar-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
     }
   </style>
 </head>
@@ -142,7 +79,7 @@
 <main class="app">
   <section class="hero">
     <h1>Ferieplan</h1>
-    <p class="subtitle">Få en enkel og smart plan for feriedagene dine – med mest mulig sammenhengende fri.</p>
+    <p class="subtitle">Finn en ferieplan som balanserer høy effektivitet, god spredning og en realistisk plan arbeidsgiver faktisk kan godta.</p>
   </section>
 
   <section class="card">
@@ -154,17 +91,19 @@
         </div>
         <div>
           <label for="days">Tilgjengelige feriedager</label>
-          <input id="days" type="number" min="1" max="60" value="25" />
+          <input id="days" type="number" min="0" max="60" value="25" />
+          <p class="help">Skriv 0 for å bare se smarte broer gjennom året.</p>
         </div>
-      </div>
-      <div>
-        <label for="transferDays">Dager til overføring til neste år</label>
-        <input id="transferDays" type="number" min="0" max="60" value="0" />
-        <p class="help">Trekkes fra årets feriedager før optimalisering.</p>
       </div>
 
       <div>
-        <label for="season">Valgt periode (preferanse)</label>
+        <label for="transferDays">Dager til overføring til neste år</label>
+        <input id="transferDays" type="number" min="0" max="60" value="0" />
+        <p class="help">Trekkes fra årets feriedager før planlegging.</p>
+      </div>
+
+      <div>
+        <label for="season">Valgt periode</label>
         <select id="season">
           <option value="all">Hele året (ingen preferanse)</option>
           <option value="spring">Vår (mars–mai)</option>
@@ -174,6 +113,7 @@
           <option value="custom">Egendefinert datoperiode (hardt krav)</option>
         </select>
       </div>
+
       <div>
         <label for="minContinuousWeeks">Minimum sammenhengende ferieperiode</label>
         <select id="minContinuousWeeks">
@@ -184,14 +124,21 @@
           <option value="4">Minst 4 uker</option>
         </select>
       </div>
+
       <div class="form-cols" id="customRange" style="display:none;">
-        <div><label for="customStart">Fra dato</label><input id="customStart" type="date" /></div>
-        <div><label for="customEnd">Til dato</label><input id="customEnd" type="date" /></div>
+        <div>
+          <label for="customStart">Fra dato</label>
+          <input id="customStart" type="date" />
+        </div>
+        <div>
+          <label for="customEnd">Til dato</label>
+          <input id="customEnd" type="date" />
+        </div>
       </div>
 
       <div>
-        <label>Foretrukne ferieperioder (valgfritt)</label>
-        <p class="help">Velg dager direkte i kalenderen under. Valgene brukes automatisk i planleggingen.</p>
+        <label>Foretrukne ferieperioder</label>
+        <p class="help">Velg dager direkte i kalenderen under. Disse blir prioritert høyt i planen.</p>
       </div>
 
       <section class="card" style="margin:0;">
@@ -199,78 +146,181 @@
           <h2 style="margin:0;">Velg ferie i kalender</h2>
           <span id="selectedCount" class="muted">0 dager valgt</span>
         </div>
+
         <div class="calendar-actions">
           <button class="ghost" type="button" onclick="selectWholeMonth()">Velg hele måneden</button>
           <button class="ghost" type="button" onclick="clearSelectedDays()">Fjern markering</button>
         </div>
+
         <div class="month-nav">
           <button class="ghost" type="button" onclick="changePickerMonth(-1)">← Forrige</button>
           <span id="pickerMonthLabel" class="month-label"></span>
           <button class="ghost" type="button" onclick="changePickerMonth(1)">Neste →</button>
         </div>
+
         <div id="calendar" style="margin-top:10px;"></div>
       </section>
 
-      <label class="inline"><input id="includeSpecial" type="checkbox" checked />
-        <span>Regn julaften (24.12) og nyttårsaften (31.12) som nyttige spesialdager</span>
+      <label class="inline">
+        <input id="includeSpecial" type="checkbox" checked />
+        <span>Regn julaften og nyttårsaften som nyttige spesialdager</span>
       </label>
-      <label class="inline"><input id="avoidPeakHolidayPeriods" type="checkbox" />
+
+      <label class="inline">
+        <input id="avoidPeakHolidayPeriods" type="checkbox" />
         <span>Unngå hovedferier</span>
       </label>
-      <p class="help">Unngår typiske perioder som sommerferie, høstferie og vinterferie.</p>
+      <p class="help">Unngår typiske perioder som juli/sommerferie, høstferie, vinterferie og jul/nyttår – med mindre du selv velger dem.</p>
 
-      <button onclick="runPlanner()">Ferieplan</button>
+      <div class="button-row">
+        <button onclick="runPlanner('balanced')">Ferieplan</button>
+        <button class="secondary" onclick="runPlanner('efficiency')">Maks effektivitet på gøy</button>
+      </div>
     </div>
   </section>
 
   <section id="result"></section>
-<section class="card" id="recalcCard" style="display:none;">
-  <h2>Beregn på nytt</h2>
-  <p class="muted">Marker dager du ikke ønsker, og beregn på nytt.</p>
-  <button id="recalculateBtn" type="button" disabled onclick="recalculateAroundDisliked()">Beregn på nytt</button>
-  <p id="recalcWarning" class="muted" style="margin-top:8px;"></p>
-</section>
+
+  <section class="card" id="recalcCard" style="display:none;">
+    <h2>Beregn på nytt</h2>
+    <p class="muted">Marker dager du ikke ønsker i resultatkalenderen, og beregn på nytt. Planleggeren prøver da å flytte ferien til andre perioder.</p>
+    <button id="recalculateBtn" type="button" disabled onclick="recalculateAroundDisliked()">Beregn på nytt</button>
+    <p id="recalcWarning" class="muted" style="margin-top:8px;"></p>
+  </section>
 </main>
+
 <div id="loadingOverlay" class="loading-overlay" aria-live="polite" aria-hidden="true">
   <div class="loading-card">
     <span class="spinner" aria-hidden="true"></span>
-    <span id="loadingMainText">Finner beste ferieplan…</span>
-    <small id="loadingSubtext" style="display:block; color:var(--muted); font-weight:500;">Ser på helligdager</small>
+    <span>
+      <span id="loadingMainText">Finner beste ferieplan…</span>
+      <small id="loadingSubtext" style="display:block;color:var(--muted);font-weight:500;">Tester ferieblokker</small>
+    </span>
   </div>
 </div>
+
 <script>
-const dayNames=["søn","man","tir","ons","tor","fre","lør"]; const monthNames=["jan","feb","mar","apr","mai","jun","jul","aug","sep","okt","nov","des"];
-const yearSel=document.getElementById('year'); const nowY=new Date().getFullYear(); for(let y=nowY;y<=nowY+3;y++){yearSel.add(new Option(String(y),String(y)));}
-let pickerMonth = new Date().getMonth();
-const season=document.getElementById('season'); season.addEventListener('change',()=>document.getElementById('customRange').style.display=season.value==='custom'?'grid':'none');
-const today = new Date();
+const dayNames=["søn","man","tir","ons","tor","fre","lør"];
+const monthNames=["jan","feb","mar","apr","mai","jun","jul","aug","sep","okt","nov","des"];
+
+const yearSel=document.getElementById('year');
+const nowY=new Date().getFullYear();
+
+for(let y=nowY;y<=nowY+3;y++){
+  yearSel.add(new Option(String(y),String(y)));
+}
+
+let pickerMonth=new Date().getMonth();
+
+const season=document.getElementById('season');
+season.addEventListener('change',()=>{
+  document.getElementById('customRange').style.display=season.value==='custom'?'grid':'none';
+});
+
+const today=new Date();
 today.setHours(0,0,0,0);
-const dateKey=d=>d.toISOString().slice(0,10); const addDays=(d,n)=>{const x=new Date(d); x.setDate(x.getDate()+n); return x;}; const isWeekend=d=>d.getDay()===0||d.getDay()===6;
-const selectedDates = new Set();
-const dislikedDates = new Set();
-let latestPlanPeriods = [];
-let latestPlanYear = null;
-const DEBUG_PLANNER = false;
-const DEBUG_CALENDAR = false;
-const DEBUG_LOADING = false;
-const FORCE_LOADING_PREVIEW = false;
-function plannerDebug(...args){ if(DEBUG_PLANNER) console.log('[PLANNER]',...args); }
-function calendarDebug(...args){ if(DEBUG_CALENDAR) console.log('[CALENDAR]',...args); }
-function loadingDebug(...args){ if(DEBUG_LOADING) console.log(...args); }
-const PLANNER_LIMITS = {
-  maxCandidatePeriods: 420,
-  maxEvaluatedPlans: 4000,
-  maxRuntimeMs: 4500
-};
 
-function easterSunday(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return new Date(y,mo-1,da);} 
-function holidaysNO(year, includeSpecial){const e=easterSunday(year);const holidays=[{date:new Date(year,0,1),name:'Nyttårsdag'},{date:addDays(e,-3),name:'Skjærtorsdag'},{date:addDays(e,-2),name:'Langfredag'},{date:addDays(e,0),name:'1. påskedag'},{date:addDays(e,1),name:'2. påskedag'},{date:new Date(year,4,1),name:'Arbeidernes dag'},{date:new Date(year,4,17),name:'Grunnlovsdag (17. mai)'},{date:addDays(e,39),name:'Kristi himmelfartsdag'},{date:addDays(e,49),name:'1. pinsedag'},{date:addDays(e,50),name:'2. pinsedag'},{date:new Date(year,11,25),name:'1. juledag'},{date:new Date(year,11,26),name:'2. juledag'}];
-if(includeSpecial){holidays.push({date:new Date(year,11,24),name:'Julaften (spesialdag)'},{date:new Date(year,11,31),name:'Nyttårsaften (spesialdag)'});} const map={};holidays.forEach(h=>map[dateKey(h.date)]=h.name); return {holidays,map};}
-function inFilter(d, year){ const s=season.value; if(d<today) return false; if(s==='custom'){const a=new Date(document.getElementById('customStart').value); const b=new Date(document.getElementById('customEnd').value); if(isNaN(a)||isNaN(b)) return false; return d>=a&&d<=b;} return d.getFullYear()===year;}
-function evaluatePeriod(start,end,map,reason){let used=0,total=0;const days=[];for(let d=new Date(start);d<=end;d=addDays(d,1)){const k=dateKey(d),h=map[k],w=isWeekend(d); total++; let type='vacation',label='Ferie'; if(h){type=h.includes('spesialdag')?'special':'holiday';label=h;} else if(w){type='weekend';label='Helg';} else used++; days.push({date:new Date(d),type,label});}
-return {start,end,used,total,gained:total-used,score:total/Math.max(used,1),days,reason};}
+const selectedDates=new Set();
+const dislikedDates=new Set();
 
-function selectedDatesToPeriods(year,map){const list=[...selectedDates].map(k=>new Date(k)).filter(d=>d.getFullYear()===year).sort((a,b)=>a-b);if(!list.length) return [];const periods=[];let start=list[0], prev=list[0];for(let i=1;i<list.length;i++){if((list[i]-prev)/(1000*60*60*24)===1){ prev=list[i]; continue; }periods.push(evaluatePeriod(start,prev,map,'Valgt i kalender'));start=list[i]; prev=list[i];}periods.push(evaluatePeriod(start,prev,map,'Valgt i kalender'));return periods;}
+let latestPlanPeriods=[];
+let latestPlanYear=null;
+
+const DEBUG_PLANNER=true;
+const DEBUG_CALENDAR=false;
+
+function plannerDebug(...args){
+  if(DEBUG_PLANNER) console.log('[PLANNER]',...args);
+}
+
+function calendarDebug(...args){
+  if(DEBUG_CALENDAR) console.log('[CALENDAR]',...args);
+}
+
+function dateKey(d){
+  const x=new Date(d);
+  x.setHours(12,0,0,0);
+  return x.toISOString().slice(0,10);
+}
+
+function addDays(d,n){
+  const x=new Date(d);
+  x.setDate(x.getDate()+n);
+  return x;
+}
+
+function isWeekend(d){
+  return d.getDay()===0||d.getDay()===6;
+}
+
+function easterSunday(y){
+  const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;
+  return new Date(y,mo-1,da);
+}
+
+function holidaysNO(year,includeSpecial){
+  const e=easterSunday(year);
+  const holidays=[
+    {date:new Date(year,0,1),name:'Nyttårsdag'},
+    {date:addDays(e,-3),name:'Skjærtorsdag'},
+    {date:addDays(e,-2),name:'Langfredag'},
+    {date:addDays(e,0),name:'1. påskedag'},
+    {date:addDays(e,1),name:'2. påskedag'},
+    {date:new Date(year,4,1),name:'Arbeidernes dag'},
+    {date:new Date(year,4,17),name:'Grunnlovsdag (17. mai)'},
+    {date:addDays(e,39),name:'Kristi himmelfartsdag'},
+    {date:addDays(e,49),name:'1. pinsedag'},
+    {date:addDays(e,50),name:'2. pinsedag'},
+    {date:new Date(year,11,25),name:'1. juledag'},
+    {date:new Date(year,11,26),name:'2. juledag'}
+  ];
+
+  if(includeSpecial){
+    holidays.push(
+      {date:new Date(year,11,24),name:'Julaften (spesialdag)'},
+      {date:new Date(year,11,31),name:'Nyttårsaften (spesialdag)'}
+    );
+  }
+
+  const map={};
+  holidays.forEach(h=>map[dateKey(h.date)]=h.name);
+  return {holidays,map};
+}
+
+function isoWeek(d){
+  const x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  x.setUTCDate(x.getUTCDate()+4-(x.getUTCDay()||7));
+  const yStart=new Date(Date.UTC(x.getUTCFullYear(),0,1));
+  return Math.ceil((((x-yStart)/86400000)+1)/7);
+}
+
+function inFilter(d,year){
+  if(d<today) return false;
+
+  const s=season.value;
+
+  if(s==='custom'){
+    const av=document.getElementById('customStart').value;
+    const bv=document.getElementById('customEnd').value;
+    const a=av?new Date(av):null;
+    const b=bv?new Date(bv):null;
+
+    if(!a||!b||isNaN(a)||isNaN(b)) return false;
+
+    a.setHours(0,0,0,0);
+    b.setHours(23,59,59,999);
+
+    return d>=a&&d<=b;
+  }
+
+  if(d.getFullYear()!==year) return false;
+  if(s==='spring') return d.getMonth()>=2&&d.getMonth()<=4;
+  if(s==='summer') return d.getMonth()>=5&&d.getMonth()<=7;
+  if(s==='autumn') return d.getMonth()>=8&&d.getMonth()<=10;
+
+  return true;
+}
+
 function seasonForDate(d){
   const m=d.getMonth();
   if(m>=2&&m<=4) return 'spring';
@@ -278,1034 +328,1145 @@ function seasonForDate(d){
   if(m>=8&&m<=10) return 'autumn';
   return 'winter';
 }
-function hasTwoConsecutiveSummerWeeksFromVacationDates(vacationDates, year){
-  if(!vacationDates.length) return false;
-  const summerStart=new Date(year,5,1);
-  const summerEnd=new Date(year,7,31);
-  const summerSet=new Set(
-    vacationDates.filter(d=>d>=summerStart && d<=summerEnd).map(dateKey)
-  );
-  if(summerSet.size<10) return false;
-  for(let d=new Date(summerStart); d<=summerEnd; d=addDays(d,1)){
-    let run=0;
-    for(let i=0;i<14;i++){
-      const check=addDays(d,i);
-      if(check>summerEnd) break;
-      if(summerSet.has(dateKey(check))) run++;
-      else run=0;
-      if(run>=14) return true;
-    }
-  }
-  return false;
+
+function seasonLabel(k){
+  return {spring:'vår',summer:'sommer',autumn:'høst',winter:'vinter'}[k]||k;
 }
-function writeSelectedToTextarea(){document.getElementById('selectedCount').textContent=`${selectedDates.size} dager valgt`;}
-function parsePreferred(year,map){return {periods:selectedDatesToPeriods(year,map),errors:[]};}
-function overlaps(p,set){return p.days.some(d=>set.has(dateKey(d.date)));}
-function workdaysBetween(periodA, periodB, holidayMap){
-  const start = addDays(periodA.end, 1);
-  const end = addDays(periodB.start, -1);
-  if(start > end) return 0;
-  let count = 0;
-  for(let d=new Date(start); d<=end; d=addDays(d,1)){
+
+function evaluatePeriod(start,end,map,reason){
+  let used=0,total=0;
+  const days=[];
+
+  for(let d=new Date(start);d<=end;d=addDays(d,1)){
     const k=dateKey(d);
-    if(isWeekend(d)) continue;
-    if(holidayMap[k]) continue;
+    const h=map[k];
+    const w=isWeekend(d);
+
+    total++;
+
+    let type='vacation';
+    let label='Ferie';
+
+    if(h){
+      type=h.includes('spesialdag')?'special':'holiday';
+      label=h;
+    }else if(w){
+      type='weekend';
+      label='Helg';
+    }else{
+      used++;
+    }
+
+    days.push({date:new Date(d),type,label});
+  }
+
+  return {
+    start:new Date(start),
+    end:new Date(end),
+    used,
+    total,
+    gained:total-used,
+    score:total/Math.max(used,1),
+    days,
+    reason
+  };
+}
+
+function selectedDatesToPeriods(year,map){
+  const list=[...selectedDates]
+    .map(k=>new Date(k))
+    .filter(d=>d.getFullYear()===year)
+    .sort((a,b)=>a-b);
+
+  if(!list.length) return [];
+
+  const periods=[];
+  let start=list[0];
+  let prev=list[0];
+
+  for(let i=1;i<list.length;i++){
+    if((list[i]-prev)/86400000===1){
+      prev=list[i];
+      continue;
+    }
+
+    periods.push(evaluatePeriod(start,prev,map,'Valgt i kalender'));
+    start=list[i];
+    prev=list[i];
+  }
+
+  periods.push(evaluatePeriod(start,prev,map,'Valgt i kalender'));
+  return periods;
+}
+
+function workdaysBetween(a,b,map){
+  const start=addDays(a.end,1);
+  const end=addDays(b.start,-1);
+
+  if(start>end) return 0;
+
+  let count=0;
+
+  for(let d=new Date(start);d<=end;d=addDays(d,1)){
+    const k=dateKey(d);
+    if(isWeekend(d)||map[k]) continue;
     count++;
   }
+
   return count;
 }
 
-function plan(year,available){
-  const startedAt=performance.now();
-  const includeSpecial=document.getElementById('includeSpecial').checked;
-  const {holidays,map}=holidaysNO(year,includeSpecial);
-  const preferred=parsePreferred(year,map);
-  const minContinuousWeeks=Number(document.getElementById('minContinuousWeeks').value||0);
-  const selectedPeriods=selectedDatesToPeriods(year,map);
-  const avoidPeakHolidayPeriods=document.getElementById('avoidPeakHolidayPeriods').checked;
-  const avoidedDates=new Set([...dislikedDates]);
-  let evaluatedPlans=0;
-  let timedOut=false;
+function isPeakDate(d){
+  const w=isoWeek(d);
+  const m=d.getMonth();
 
-  function outOfTime(){ if(performance.now()-startedAt>PLANNER_LIMITS.maxRuntimeMs){timedOut=true; return true;} return false; }
-  function efficiencyBand(eff){ if(eff>=2.8) return 'premium'; if(eff>=2.2) return 'høy'; if(eff>=1.8) return 'god'; return 'standard'; }
-  function candidateTypeFromReason(reason){
+  if(m===6) return true;
+  if(w===8||w===9) return true;
+  if(w===40||w===41) return true;
+  if((m===11&&d.getDate()>=24)||(m===0&&d.getDate()<=3)) return true;
+
+  return false;
+}
+
+function periodTouchesPeak(p){
+  return p.days.some(day=>isPeakDate(day.date));
+}
+
+function selectedOverlap(p){
+  if(!selectedDates.size) return 0;
+  return p.days.filter(d=>d.type==='vacation'&&selectedDates.has(dateKey(d.date))).length;
+}
+
+function formatDate(d){
+  return `${d.getDate()}. ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function buildBlocks(year,maxDays,opts={}){
+  const includeSpecial=document.getElementById('includeSpecial').checked;
+  const {map}=holidaysNO(year,includeSpecial);
+  const avoidPeak=document.getElementById('avoidPeakHolidayPeriods').checked;
+  const seasonPref=season.value;
+  const avoidSet=opts.avoidSet||new Set();
+  const allowPast=!!opts.allowPast;
+
+  function okDate(d){
+    if(!allowPast&&d<today) return false;
+    if(seasonPref==='custom') return inFilter(d,year);
+    return d.getFullYear()===year;
+  }
+
+  function hasBlocked(p){
+    return p.days.some(d=>d.type==='vacation'&&avoidSet.has(dateKey(d.date)));
+  }
+
+  function clean(p){
+    if(p.used>=5) return true;
+    return [1,4,5].includes(p.start.getDay())&&[0,5,6].includes(p.end.getDay());
+  }
+
+  function classify(p,reason){
+    if(reason.includes('Valgt')) return 'selected';
     if(reason.includes('Påske')) return 'easter';
     if(reason.includes('Jul')) return 'christmas';
-    if(reason.includes('Sommer')) return 'summerBlock';
-    if(reason.includes('Langhelg')) return 'longWeekend';
-    if(reason.includes('Hel uke')) return 'fullWeek';
-    return 'bridge';
+    if(p.used>=10) return 'mainBlock';
+    if(p.used>=5) return 'fullWeek';
+    if(p.total>=4&&p.used<=3&&p.score>=1.8) return 'bridge';
+    return 'short';
   }
-  function cleanStructure(p){
-    const startDow=p.start.getDay(); const endDow=p.end.getDay();
-    return (startDow===1||startDow===5||startDow===6) && (endDow===0||endDow===5||endDow===6);
-  }
-  function fitsPeriod(p){ if(!(p.used>0 && p.used<=available && inFilter(p.start,year) && inFilter(p.end,year))) return false;
-    const hasBlocked=p.days.some(d=>d.type==='vacation' && avoidedDates.has(dateKey(d.date)));
-    return !hasBlocked;
-  }
-  function addCandidate(list,start,end,reason,kind='bridge'){
-    if(list.length>=PLANNER_LIMITS.maxCandidatePeriods||outOfTime()) return;
+
+  function add(list,start,end,reason){
     const p=evaluatePeriod(start,end,map,reason);
-    if(!fitsPeriod(p)) return;
-    p.type=kind;
+
+    if(!p.used||p.used>maxDays) return;
+    if(!okDate(p.start)||!okDate(p.end)) return;
+    if(hasBlocked(p)) return;
+
     p.efficiency=p.total/Math.max(1,p.used);
-    p.quality=efficiencyBand(p.efficiency);
-    p.clean=cleanStructure(p);
+    p.clean=clean(p);
     p.redDayLeverage=p.days.filter(d=>d.type==='holiday'||d.type==='special').length;
+    p.type=classify(p,reason);
     p.id=`${dateKey(p.start)}_${dateKey(p.end)}_${reason}`;
+
+    if(avoidPeak&&periodTouchesPeak(p)&&p.type!=='selected'&&!(p.efficiency>=3.2&&p.used<=3)) return;
+
     list.push(p);
   }
 
-  const allCandidates=[];
-  const add=(start,end,reason,kind)=>addCandidate(allCandidates,start,end,reason,kind);
+  const blocks=[];
 
-  const easter=easterSunday(year);
-  add(addDays(easter,-4),addDays(easter,1),'Påske 4+10','easter');
-  add(addDays(easter,-5),addDays(easter,1),'Påske 5+11','easter');
-  add(addDays(easter,-2),addDays(easter,1),'Påske kortbro','bridge');
-
-  [[new Date(year,3,30),new Date(year,4,3),'1. mai langhelg'],[new Date(year,4,15),new Date(year,4,18),'17. mai langhelg']].forEach(r=>add(r[0],r[1],r[2],'longWeekend'));
-  const ascension=addDays(easter,39);
-  add(addDays(ascension,-1),addDays(ascension,3),'Kristi himmelfart bro','bridge');
-  add(addDays(ascension,0),addDays(ascension,3),'Kristi himmelfart langhelg','longWeekend');
-
-  const pentecost=addDays(easter,50);
-  add(addDays(pentecost,-3),addDays(pentecost,0),'Pinsebro','bridge');
-
-  add(new Date(year,11,22),new Date(year+1,0,2),'Jul/nyttår hovedblokk','christmas');
-  add(new Date(year,11,24),new Date(year,11,31),'Jul/nyttår kort','christmas');
-
-  for(let d=new Date(year,0,1); d<=new Date(year,11,31) && !outOfTime(); d=addDays(d,1)){
-    if(!inFilter(d,year)) continue;
-    if(d.getDay()===1){
-      add(d,addDays(d,4),'Hel uke','fullWeek');
-      add(d,addDays(d,11),'Sommerblokk 2 uker','summerBlock');
-      add(d,addDays(d,18),'Sommerblokk 3 uker','summerBlock');
+  selectedDatesToPeriods(year,map).forEach(p=>{
+    if(p.used&&p.used<=maxDays&&!hasBlocked(p)){
+      p.efficiency=p.total/Math.max(1,p.used);
+      p.clean=true;
+      p.redDayLeverage=p.days.filter(d=>d.type==='holiday'||d.type==='special').length;
+      p.type='selected';
+      p.id=`selected_${dateKey(p.start)}_${dateKey(p.end)}`;
+      blocks.push(p);
     }
-    if(d.getDay()===5) add(addDays(d,-1),addDays(d,2),'Langhelg','longWeekend');
-  }
-
-  const candidates=[...new Map(allCandidates.sort((a,b)=>a.used-b.used).map(c=>[c.id,c])).values()]
-    .sort((a,b)=> (b.efficiency-a.efficiency) || (Number(b.clean)-Number(a.clean)) || (b.redDayLeverage-a.redDayLeverage) || (a.used-b.used));
-
-  const premiumCandidates=candidates.filter(c=>c.efficiency>=2.2 && c.used<=Math.max(6,Math.floor(available*0.35)));
-  const mustConsider=candidates.filter(c=>c.efficiency>=2.8 || (c.efficiency>=2.2 && c.redDayLeverage>=1));
-
-  function createCustomPeriod(start,end,reason,type='bridge',chosenWhy='generated'){
-    const p=evaluatePeriod(start,end,map,reason);
-    if(!fitsPeriod(p)) return null;
-    p.type=type; p.efficiency=p.total/Math.max(1,p.used); p.quality=efficiencyBand(p.efficiency); p.clean=cleanStructure(p);
-    p.redDayLeverage=p.days.filter(d=>d.type==='holiday'||d.type==='special').length;
-    p.id=`gen_${type}_${dateKey(start)}_${dateKey(end)}_${reason}`;
-    p.chosenWhy=chosenWhy;
-    return p;
-  }
-  function buildFromBlocks(blocks){
-    const periods=[]; const usedDates=new Set(); let used=0;
-    for(const b of blocks){
-      const p=createCustomPeriod(b.start,b.end,b.reason,b.type||'bridge','generated');
-      if(!p) continue;
-      if(p.days.some(d=>usedDates.has(dateKey(d.date)))) continue;
-      if(used+p.used>available) continue;
-      periods.push(p); p.days.forEach(d=>usedDates.add(dateKey(d.date))); used+=p.used;
-    }
-    return periods.sort((a,b)=>a.start-b.start);
-  }
-  function generateStructuredCandidates(){
-    const yearEnd=new Date(year,11,31);
-    const springOpts=[
-      {start:addDays(easter,-4),end:addDays(easter,1),reason:'Påske 4+10',type:'easter'},
-      {start:addDays(ascension,-1),end:addDays(ascension,3),reason:'Kristi himmelfart bro',type:'bridge'},
-      {start:new Date(year,3,30),end:new Date(year,4,3),reason:'1. mai langhelg',type:'longWeekend'}
-    ];
-    const mayOpts=[
-      [],
-      [{start:addDays(ascension,-1),end:addDays(ascension,3),reason:'Mai bro 1',type:'bridge'}],
-      [{start:addDays(ascension,-1),end:addDays(ascension,3),reason:'Mai bro 1',type:'bridge'},{start:new Date(year,4,15),end:new Date(year,4,18),reason:'17. mai langhelg',type:'longWeekend'}]
-    ];
-    const summerStarts=[new Date(year,5,15),new Date(year,5,22),new Date(year,5,29),new Date(year,6,6),new Date(year,6,13),new Date(year,6,20),new Date(year,6,27),new Date(year,7,3),new Date(year,7,10),new Date(year,7,17)];
-    const summerLens=[4,6,9,11,14,18];
-    const autumnOpts=[
-      {start:new Date(year,8,8),end:new Date(year,8,14),reason:'Septemberuke',type:'fullWeek'},
-      {start:new Date(year,9,5),end:new Date(year,9,11),reason:'Høstuke',type:'fullWeek'},
-      {start:new Date(year,9,12),end:new Date(year,9,18),reason:'Høstuke sen',type:'fullWeek'},
-      {start:new Date(year,10,2),end:new Date(year,10,8),reason:'Novemberuke',type:'fullWeek'},
-      null
-    ];
-    const xmasOpts=[
-      {start:new Date(year,11,24),end:new Date(year+1,0,3),reason:'Jul/nyttår lang',type:'christmas'},
-      {start:new Date(year,11,24),end:new Date(year,11,31),reason:'Jul/nyttår kort',type:'christmas'},
-      null
-    ];
-    const extras=[null,{start:addDays(pentecost,-3),end:addDays(pentecost,0),reason:'Pinsebro',type:'bridge'},{start:new Date(year,2,23),end:new Date(year,2,26),reason:'Vårbro',type:'bridge'}];
-    const out=[]; let id=0;
-    for(const sp of springOpts){
-      for(const mo of mayOpts){
-        for(const ss of summerStarts){
-          for(const len of summerLens){
-            for(const au of autumnOpts){
-              for(const xm of xmasOpts){
-                for(const ex of extras){
-                  const blocks=[sp,...mo,{start:ss,end:addDays(ss,len),reason:len>=11?'Sommer hovedferie':'Sommeruke',type:'summerBlock'}];
-                  if(au) blocks.push(au); if(xm) blocks.push(xm); if(ex) blocks.push(ex);
-                  if(avoidPeakHolidayPeriods && blocks.some(b=>b && b.start.getMonth()===6)) continue;
-                  const periods=buildFromBlocks(blocks.filter(Boolean));
-                  if(periods.length===0) continue;
-                  out.push({strategy:'searchGrid',candidateId:`grid_${id++}`,periods});
-                  if(out.length>=520) return out;
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    return out;
-  }
-
-  function buildPlan(strategy){
-    const usedDates=new Set(); const periods=[]; let used=0;
-    function pushCandidate(c,why){
-      if(c.used+used>available) return false;
-      if(c.days.some(d=>usedDates.has(dateKey(d.date)))) return false;
-      periods.push({...c,chosenWhy:why});
-      c.days.forEach(d=>usedDates.add(dateKey(d.date)));
-      used+=c.used; return true;
-    }
-    selectedPeriods.forEach(p=>pushCandidate({...p,type:'bridge',efficiency:p.total/Math.max(1,p.used),quality:efficiencyBand(p.total/Math.max(1,p.used)),clean:true,redDayLeverage:p.days.filter(d=>d.type==='holiday'||d.type==='special').length,id:`selected_${dateKey(p.start)}_${dateKey(p.end)}`},'selected'));
-    mustConsider.forEach(c=>{ if(c.used<=4 || c.type==='easter' || c.type==='christmas') pushCandidate(c,'must-consider'); });
-
-    const priorityByStrategy={
-      balanced:['summerBlock','easter','christmas','bridge','fullWeek','longWeekend'],
-      leverage:['easter','christmas','bridge','longWeekend','summerBlock','fullWeek'],
-      fullWeeks:['fullWeek','summerBlock','easter','christmas','bridge','longWeekend'],
-      spread:['bridge','longWeekend','easter','christmas','fullWeek','summerBlock'],
-      summerBridges:['summerBlock','bridge','easter','christmas','fullWeek','longWeekend'],
-      userPriority:['bridge','summerBlock','easter','christmas','fullWeek','longWeekend'],
-      summerHeavy:['summerBlock','fullWeek','bridge','easter','christmas','longWeekend'],
-      autumnHeavy:['fullWeek','bridge','summerBlock','christmas','easter','longWeekend'],
-      christmasHeavy:['christmas','bridge','summerBlock','fullWeek','easter','longWeekend'],
-      managerFriendly:['summerBlock','fullWeek','christmas','easter','bridge','longWeekend'],
-      avoidFragmentation:['summerBlock','fullWeek','christmas','easter','longWeekend','bridge'],
-      earlySummer:['fullWeek','summerBlock','bridge','easter','christmas','longWeekend'],
-      lateSummer:['bridge','christmas','summerBlock','fullWeek','easter','longWeekend'],
-      avoidPeakHolidays:['easter','bridge','fullWeek','christmas','summerBlock','longWeekend'],
-      fallbackTemplate:['easter','bridge','summerBlock','fullWeek','christmas','longWeekend']
-    };
-    const typePriority=priorityByStrategy[strategy]||priorityByStrategy.balanced;
-
-    typePriority.forEach(type=>{
-      candidates.filter(c=>c.type===type).forEach(c=>pushCandidate(c,'priority'));
-    });
-    premiumCandidates.forEach(c=>pushCandidate(c,'premium-fill'));
-    // hard fill remaining days with best non-overlapping candidates to avoid unused quota
-    const remainingCandidates=[...candidates].sort((a,b)=>b.used-a.used||b.efficiency-a.efficiency);
-    remainingCandidates.forEach(c=>pushCandidate(c,'remaining-fill'));
-    return periods.sort((a,b)=>a.start-b.start);
-  }
-
-  function countPeriodsInRollingWindow(periods, windowDays){
-    const sorted=[...periods].sort((a,b)=>a.start-b.start);
-    let maxCount=0;
-    for(let i=0;i<sorted.length;i++){
-      const windowStart=sorted[i].start;
-      const windowEnd=addDays(windowStart,windowDays-1);
-      const count=sorted.filter(p=>p.start<=windowEnd && p.end>=windowStart).length;
-      if(count>maxCount) maxCount=count;
-    }
-    return maxCount;
-  }
-
-  function countMiniBreaksInMonth(periods, month){
-    return periods.filter(p=>{
-      const touchesMonth=p.start.getMonth()<=month && p.end.getMonth()>=month;
-      const isMiniBreak=p.used>0 && p.used<=3;
-      return touchesMonth && isMiniBreak;
-    }).length;
-  }
-
-  function getPeriodSignature(period){
-    const startDow=period.start.getDay();
-    const endDow=period.end.getDay();
-    const usedWeekdays=period.days.filter(d=>d.type==='vacation').map(d=>d.date.getDay());
-    const usesThuOrFri=usedWeekdays.some(d=>d===4||d===5);
-    const key=`${startDow}-${endDow}`;
-    if(key==='4-0') return 'thu-sun';
-    if(key==='5-1') return 'fri-mon';
-    if(key==='4-5') return 'thu-fri';
-    if(key==='1-2') return 'mon-tue';
-    if(usesThuOrFri && period.used<=2) return 'thu-fri-usage';
-    if(period.used<=3) return `mini-${key}`;
-    return null;
-  }
-
-  function analyzeManagerPattern(periods){
-    const sorted=[...periods].sort((a,b)=>a.start-b.start);
-    const periodCount=sorted.length;
-    const quarterCounts={Q1:0,Q2:0,Q3:0,Q4:0};
-    sorted.forEach(p=>{ const q=`Q${Math.floor(p.start.getMonth()/3)+1}`; quarterCounts[q]++; });
-    let maxConsecutiveWeeks=0;
-    let current=0;
-    let prevWeek=null;
-    sorted.forEach(p=>{
-      const ws=new Date(p.start); ws.setDate(ws.getDate()-((ws.getDay()+6)%7)); ws.setHours(0,0,0,0);
-      const weekKey=Math.floor(ws.getTime()/604800000);
-      if(prevWeek!==null && weekKey===prevWeek+1) current++; else current=1;
-      prevWeek=weekKey;
-      maxConsecutiveWeeks=Math.max(maxConsecutiveWeeks,current);
-    });
-
-    const rollingWindowCounts=[];
-    const signatureStats={};
-    let repeatedPatternCount=0;
-    let hardReject=false;
-    let repeatedMiniBreakReject=false;
-    for(let i=0;i<sorted.length;i++){
-      const start=sorted[i].start;
-      const end=addDays(start,59);
-      const inWin=sorted.filter(p=>p.start<=end && p.end>=start);
-      rollingWindowCounts.push({start:dateKey(start),count:inWin.length});
-      const local={};
-      inWin.forEach(p=>{
-        const sig=getPeriodSignature(p);
-        if(!sig) return;
-        local[sig]=(local[sig]||0)+1;
-      });
-      Object.entries(local).forEach(([sig,c])=>{
-        signatureStats[sig]=Math.max(signatureStats[sig]||0,c);
-        if(c>2) repeatedPatternCount++;
-        if(c>3) {hardReject=true; repeatedMiniBreakReject=true;}
-      });
-    }
-    return {periodCount,quarterCounts,maxConsecutiveWeeks,rollingWindowCounts,signatureStats,repeatedPatternCount,hardReject,repeatedMiniBreakReject};
-  }
-
-
-  function isoWeek(d){
-    const x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
-    x.setUTCDate(x.getUTCDate()+4-(x.getUTCDay()||7));
-    const yStart=new Date(Date.UTC(x.getUTCFullYear(),0,1));
-    return Math.ceil((((x-yStart)/86400000)+1)/7);
-  }
-  function periodTouchesPeak(p){
-    return p.days.some(day=>{
-      const dt=day.date; const w=isoWeek(dt); const m=dt.getMonth();
-      if(m===6) return true; // july
-      if(w===8||w===9||w===40||w===41) return true;
-      if((m===11&&dt.getDate()>=24)||(m===0&&dt.getDate()<=3)) return true;
-      return false;
-    });
-  }
-  function validateRealLifeVacationShape(planPeriods,opts){
-    const sorted=[...planPeriods].sort((a,b)=>a.start-b.start);
-    const reasons=[];
-    const separate=sorted.length;
-    const partialWeeks=sorted.filter(p=>p.used>0&&p.used<5).length;
-    const vacDays=sorted.flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>d.date));
-    const sept1=new Date(opts.year,8,1);
-    const beforeSept=vacDays.filter(d=>d<sept1).length/Math.max(1,vacDays.length);
-    const hasMainHoliday=sorted.some(p=>p.used>=10 && p.start.getMonth()>=5 && p.start.getMonth()<=7);
-    const hasAutumnOrWinterBreak=sorted.some(p=>p.used>=3 && (p.start.getMonth()>=8 || p.start.getMonth()<=1));
-    const hasChristmasNewYearBlock=sorted.some(p=>p.start<=new Date(opts.year,11,31) && p.end>=new Date(opts.year,11,24));
-    if(opts.available>=20){
-      if(separate>6) reasons.push('too-many-periods');
-      if(separate>=10) reasons.push('extreme-period-fragmentation');
-      if(!opts.avoidPeak && !hasMainHoliday && opts.minContinuousWeeks>=2) reasons.push('missing-main-holiday');
-      if(!hasAutumnOrWinterBreak) reasons.push('missing-autumn-or-winter-break');
-      if(beforeSept>0.75) reasons.push('too-many-days-before-september');
-      if(partialWeeks>4) reasons.push('too-many-partial-weeks');
-    }
-    return {isValid:reasons.length===0,reasons,separate,hasMainHoliday,hasAutumnOrWinterBreak,hasChristmasNewYearBlock,beforeSept};
-  }
-
-  function scorePlan(planPeriods,strategy){
-    evaluatedPlans++;
-    const used=planPeriods.reduce((s,p)=>s+p.used,0);
-    const free=planPeriods.reduce((s,p)=>s+p.total,0);
-    const eff=free/Math.max(1,used);
-    const fullWeeks=planPeriods.filter(p=>p.type==='fullWeek'||p.type==='summerBlock').length;
-    const redLeverage=planPeriods.reduce((s,p)=>s+p.redDayLeverage,0);
-    const months=new Set(planPeriods.map(p=>p.start.getMonth())).size;
-    const largest=Math.max(0,...planPeriods.map(p=>p.used));
-    const partial=planPeriods.filter(p=>!p.clean).length;
-    const unused=Math.max(0,available-used);
-    const sorted=[...planPeriods].sort((a,b)=>a.start-b.start);
-    const vacationDays=sorted.flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>d.date));
-    const seasonBuckets={spring:0,summer:0,autumn:0,winter:0};
-    vacationDays.forEach(d=>{ seasonBuckets[seasonForDate(d)]++; });
-    const usedSeasons=Object.values(seasonBuckets).filter(v=>v>0).length;
-    const dominantSeasonShare=(used>0?Math.max(...Object.values(seasonBuckets))/used:0);
-    const summerStart=new Date(year,5,1);
-    const summerEnd=new Date(year,7,31);
-    const isCustomSeason=season.value==='custom';
-    const noSeasonPreference=season.value==='all';
-    const summerDays=sorted.reduce((sum,p)=>sum+p.days.filter(d=>d.type==='vacation' && d.date>=summerStart && d.date<=summerEnd).length,0);
-    const summerFullWeeks=sorted.filter(p=>p.used>=5 && p.start<=summerEnd && p.end>=summerStart).length;
-    const twoWeekMainHoliday=hasTwoConsecutiveSummerWeeksFromVacationDates(vacationDays, year);
-    const fullWeekCount=sorted.filter(p=>p.used>=5).length;
-    let closeGapPenalty=0;
-    let repeatedCloseTransitions=0;
-    let repeatedWorkRhythmPenalty=0;
-    let shortWorkGapTransitions=0;
-    let prevClose=false;
-    let closeGapTouched=false;
-    let closeGapReduced=false;
-
-    const profileBase=strategy==='spread'?18:(strategy==='fullWeeks'?10:14);
-    const gapSequence=[];
-    for(let i=1;i<sorted.length;i++){
-      const a=sorted[i-1];
-      const b=sorted[i];
-      const gap=workdaysBetween(a,b,map);
-      gapSequence.push(gap);
-      let gapPenalty=0;
-      if(gap===0) gapPenalty=profileBase;
-      else if(gap<=2) gapPenalty=Math.round(profileBase*0.65);
-      else if(gap<=4) gapPenalty=Math.round(profileBase*0.35);
-      let reducedByHighEfficiency=false;
-      if(gapPenalty>0){
-        closeGapTouched=true;
-        if(b.efficiency>=3.0){ gapPenalty*=0.25; reducedByHighEfficiency=true; }
-        else if(b.efficiency>=2.5){ gapPenalty*=0.5; reducedByHighEfficiency=true; }
-        if(b.chosenWhy==='selected'){ gapPenalty=Math.min(gapPenalty,2); }
-        if(reducedByHighEfficiency) closeGapReduced=true;
-      }
-      closeGapPenalty+=gapPenalty;
-      const isClose=gap<=2;
-      if(prevClose && isClose) repeatedCloseTransitions++;
-      if(gap>=2 && gap<=4) shortWorkGapTransitions++;
-      prevClose=isClose;
-      if(DEBUG_PLANNER && gapPenalty>0){
-        plannerDebug('close-period-penalty',{
-          periodA:`${dateKey(a.start)} -> ${dateKey(a.end)}`,
-          periodB:`${dateKey(b.start)} -> ${dateKey(b.end)}`,
-          workdaysBetween:gap,
-          penalty:Number(gapPenalty.toFixed(2)),
-          highEfficiencyReduced:reducedByHighEfficiency
-        });
-      }
-    }
-    let repeatedMiniBreakWindowPenalty=0;
-    let extremeMiniBreakWindowPenalty=0;
-    const rolling45MaxPeriods=countPeriodsInRollingWindow(sorted,45);
-    const mayMiniBreakCount=countMiniBreaksInMonth(sorted,4);
-    const hasMainBlockInMay=sorted.some(p=>p.used>=5 && p.start.getMonth()<=4 && p.end.getMonth()>=4);
-    let clusteringPenalty=0;
-
-    if(rolling45MaxPeriods>3){
-      clusteringPenalty+=(rolling45MaxPeriods-3)*120;
-    }
-    if(mayMiniBreakCount>2 && !hasMainBlockInMay){
-      clusteringPenalty+=(mayMiniBreakCount-2)*160;
-    }
-
-    for(let i=0;i<sorted.length;i++){
-      const windowStart=sorted[i].start;
-      const rolling45End=addDays(windowStart,44);
-      const periodsIn45=sorted.filter(p=>p.start<=rolling45End && p.end>=windowStart);
-      if(periodsIn45.length>3){
-        const weightedExcess=periodsIn45.slice(3).reduce((sum,p)=>{
-          if(p.efficiency>=3.0) return sum+0.25;
-          if(p.efficiency>=2.8) return sum+0.55;
-          return sum+1;
-        },0);
-        repeatedMiniBreakWindowPenalty+=weightedExcess*24;
-      }
-      if(periodsIn45.length>4){
-        const weightedExtremeExcess=periodsIn45.slice(4).reduce((sum,p)=>{
-          if(p.efficiency>=3.0) return sum+0.35;
-          return sum+1;
-        },0);
-        extremeMiniBreakWindowPenalty+=weightedExtremeExcess*36;
-      }
-    }
-    if(gapSequence.length>=2){
-      for(let i=1;i<gapSequence.length;i++){
-        const previousGap=gapSequence[i-1];
-        const currentGap=gapSequence[i];
-        const repeatedShortWorkGap=(previousGap>=2 && previousGap<=4) && (currentGap>=2 && currentGap<=4);
-        if(repeatedShortWorkGap){
-          repeatedWorkRhythmPenalty += strategy==='spread' ? 16 : 14;
-        }
-      }
-    }
-    if(shortWorkGapTransitions>=3){
-      repeatedWorkRhythmPenalty += (shortWorkGapTransitions-2)*(strategy==='spread'?12:10);
-    }
-    let staccatoPatternPenalty=0;
-    for(let i=0;i<=gapSequence.length-2;i++){
-      if(gapSequence[i]===2 && gapSequence[i+1]===2) staccatoPatternPenalty+=26;
-    }
-    if(gapSequence.length>=3){
-      for(let i=0;i<=gapSequence.length-3;i++){
-        if(gapSequence[i]===2 && gapSequence[i+1]===2 && gapSequence[i+2]===2) staccatoPatternPenalty+=44;
-      }
-    }
-    const repeatedPenalty=repeatedCloseTransitions*(strategy==='spread'?12:(strategy==='fullWeeks'?10:11));
-    const breakCount=sorted.length;
-    const concentrationPenalty=Math.max(0, largest - Math.round(Math.max(used,1)*0.65))*2;
-    const mainHolidayQuality=Math.max(0,Math.min(40,largest*1.4));
-    let clusterWindowPenalty=0;
-    let periodClusterPenalty=0;
-    let concentrationWindowPenalty=0;
-    for(let i=0;i<sorted.length;i++){
-      const windowStart=sorted[i].start;
-      const sixtyDayEnd=addDays(windowStart,59);
-      const fiftySixDayEnd=addDays(windowStart,55);
-      const daysIn60=sorted.reduce((sum,p)=>sum+p.days.filter(d=>d.type==='vacation' && d.date>=windowStart && d.date<=sixtyDayEnd).length,0);
-      const periodsIn56=sorted.filter(p=>p.start<=fiftySixDayEnd && p.end>=windowStart).length;
-      const ratio=daysIn60/Math.max(1,used);
-      if(ratio>0.55) concentrationWindowPenalty+=Math.round((ratio-0.55)*100)*2.4;
-      else if(ratio>0.45) concentrationWindowPenalty+=Math.round((ratio-0.45)*100)*1.2;
-      if(periodsIn56>4) periodClusterPenalty+=(periodsIn56-4)*13;
-      if(periodsIn56>2){
-        const nonExceptional=sorted.filter(p=>p.start<=fiftySixDayEnd && p.end>=windowStart && p.efficiency<2.8).length;
-        if(nonExceptional>2) clusterWindowPenalty+=(nonExceptional-2)*9;
-      }
-    }
-    const spreadBonus=months*6;
-    const breakPenalty=breakCount>6?(breakCount-6)*8:0;
-    const weights={eff:10,lever:7,full:6};
-    let score=free*8 + weights.eff*eff*1.2 + redLeverage*weights.lever + fullWeeks*weights.full + spreadBonus + mainHolidayQuality - partial*8 - largest - breakPenalty - concentrationPenalty;
-    if(eff>2.0) score+=12; if(eff>2.5) score+=22; if(eff>2.8) score+=30;
-    if(unused===0) score+=24;
-    else if(unused<=2) score-=unused*28;
-    else if(unused<=5) score-=unused*60;
-    else score-=unused*120;
-    if(minContinuousWeeks>0){ const minReq=minContinuousWeeks*5; score += planPeriods.some(p=>p.used>=minReq)?18:-30; }
-    if(strategy==='fullWeeks' && fullWeeks===0) score-=40;
-    if(strategy==='spread' && months<4) score-=24;
-    if(strategy==='summerBridges' && !planPeriods.some(p=>p.type==='summerBlock')) score-=35;
-    if(strategy==='leverage' && redLeverage<3) score-=22;
-    if(strategy==='userPriority' && selectedPeriods.length>0 && !planPeriods.some(p=>p.chosenWhy==='selected')) score-=45;
-    if(strategy==='summerHeavy' && summerDays<10) score-=40;
-    if(strategy==='autumnHeavy' && seasonBuckets.autumn<4) score-=35;
-    if(strategy==='christmasHeavy' && !planPeriods.some(p=>p.type==='christmas')) score-=35;
-    if(strategy==='managerFriendly' && sorted.length>6) score-=120;
-    if(strategy==='avoidFragmentation' && sorted.length>5) score-=140;
-    if(strategy==='earlySummer' && !sorted.some(p=>p.start.getMonth()===5||p.start.getMonth()===6)) score-=30;
-    if(strategy==='lateSummer' && !sorted.some(p=>p.start.getMonth()>=7&&p.start.getMonth()<=8)) score-=30;
-    if(strategy==='avoidPeakHolidays' && sorted.some(p=>periodTouchesPeak(p))) score-=200;
-
-    if(available>=20 && !isCustomSeason && season.value==='summer'){
-      if(twoWeekMainHoliday) score+=24;
-      else if(summerFullWeeks>=1) score+=14;
-      else score-=18;
-    }
-    if(available>=20){
-      if(fullWeekCount>=2 || twoWeekMainHoliday) score+=20;
-      else if(fullWeekCount>=1) score+=8;
-      else score-=20;
-    }
-    if(available>=20 && summerDays<5 && !isCustomSeason && season.value==='summer') score-=28;
-    if(usedSeasons>=3) score+=28;
-    if(usedSeasons===4) score+=70;
-    if(dominantSeasonShare>0.5) score-=(dominantSeasonShare-0.5)*(noSeasonPreference?420:280);
-    if(dominantSeasonShare>0.65) score-=(noSeasonPreference?180:120)+(dominantSeasonShare-0.65)*(noSeasonPreference?620:420);
-    if(noSeasonPreference){
-      if(usedSeasons>=3) score+=40;
-      if(usedSeasons===4) score+=50;
-    }
-
-    if(available>=20){
-      const autumnStart=new Date(year,8,1), autumnEnd=new Date(year,10,30);
-      const hasAutumnWeek=sorted.some(p=>p.used>=5 && p.start<=autumnEnd && p.end>=autumnStart);
-      const hasAutumnLongWeekend=sorted.some(p=>p.used>=2 && p.total>=4 && p.start<=autumnEnd && p.end>=autumnStart);
-      if(hasAutumnWeek) score+=56;
-      else if(hasAutumnLongWeekend) score+=28;
-      else score-=220;
-    }
-    if(available>=20 && !noSeasonPreference){
-      const julyStart=new Date(year,6,1);
-      const usedBeforeJuly=vacationDays.filter(d=>d<julyStart).length;
-      const earlyShare=usedBeforeJuly/Math.max(1,used);
-      if(earlyShare>0.65) score-=180+(earlyShare-0.65)*260;
-      else if(earlyShare>0.5) score-=75+(earlyShare-0.5)*180;
-    }
-    if(available>=20){
-      const seasonalPresenceCount=['spring','summer','autumn'].filter(s=>seasonBuckets[s]>0).length;
-      if(seasonalPresenceCount===3) score+=80;
-      else if(seasonalPresenceCount===2) score+=20;
-      else score-=130;
-      if(seasonBuckets.spring>0 && seasonBuckets.summer>0 && seasonBuckets.autumn>0) score+=40;
-      if(seasonBuckets.winter>0) score+=10;
-    }
-    score-=closeGapPenalty;
-    score-=repeatedPenalty;
-    score-=clusterWindowPenalty;
-    score-=periodClusterPenalty;
-    score-=concentrationWindowPenalty;
-    score-=repeatedMiniBreakWindowPenalty;
-    score-=extremeMiniBreakWindowPenalty;
-    score-=repeatedWorkRhythmPenalty;
-    score-=staccatoPatternPenalty;
-    score-=clusteringPenalty;
-    const managerPattern=analyzeManagerPattern(sorted);
-    const quarterPenalty=Object.values(managerPattern.quarterCounts).reduce((sum,c)=>sum+(c>3?(c-3)*16:0),0);
-    const tooManyPeriodsPenalty=managerPattern.periodCount>=10?(managerPattern.periodCount-9)*90:(managerPattern.periodCount>6?(managerPattern.periodCount-6)*18:0);
-    const consecutiveWeekPenalty=managerPattern.maxConsecutiveWeeks>=4?(managerPattern.maxConsecutiveWeeks-3)*120:0;
-    const repeatedPatternPenalty=Object.values(managerPattern.signatureStats).reduce((sum,c)=>sum+(c>2?(c-2)*85:0),0);
-    const rhythmFloorPenalty=shortWorkGapTransitions>0?shortWorkGapTransitions*8:0;
-    let peakPenalty=0;
-    if(avoidPeakHolidayPeriods){
-      peakPenalty=sorted.filter(p=>periodTouchesPeak(p)).reduce((sum,p)=>sum+(p.used>=5?120:60),0);
-    }
-    const avoidedDatesUsed=sorted.flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>dateKey(d.date))).filter(k=>avoidedDates.has(k)).length;
-    const avoidedDatesPenalty=avoidedDatesUsed*500;
-    const managerApprovalPenalty=quarterPenalty+tooManyPeriodsPenalty+consecutiveWeekPenalty+repeatedPatternPenalty+rhythmFloorPenalty+peakPenalty+avoidedDatesPenalty;
-    score-=managerApprovalPenalty;
-    const hardClusterViolation=(rolling45MaxPeriods>4) || (mayMiniBreakCount>3);
-    const repeatedMiniBreakRejected=managerPattern.hardReject && !planPeriods.some(p=>p.chosenWhy==='selected');
-    const shapeValidation=validateRealLifeVacationShape(planPeriods,{available,year,avoidPeak:avoidPeakHolidayPeriods,minContinuousWeeks});
-    if(!shapeValidation.isValid && !planPeriods.some(p=>p.chosenWhy==='selected')) score-=320*shapeValidation.reasons.length;
-    const totalYearScore=score;
-    const rejectedReason=shapeValidation.isValid?'' : `shape:${shapeValidation.reasons.join(',')}`;
-    return {score,totalYearScore,used,free,eff,unused,fullWeeks,months,closeGapPenalty,repeatedPenalty,repeatedWorkRhythmPenalty,repeatedMiniBreakWindowPenalty,extremeMiniBreakWindowPenalty,closeGapTouched,closeGapReduced,clusterWindowPenalty,periodClusterPenalty,concentrationWindowPenalty,twoWeekMainHoliday,fullWeekCount,summerDays,rolling45MaxPeriods,mayMiniBreakCount,clusteringPenalty,hardClusterViolation,seasonBuckets,usedSeasons,dominantSeasonShare,staccatoPatternPenalty,managerApprovalPenalty,managerPattern,repeatedMiniBreakRejected,shapeValidation,avoidPeakHolidayPeriods,rejectedReason,avoidedDatesUsed,avoidedDatesPenalty};
-  }
-
-  const candidateStrategies=['balanced','leverage','fullWeeks','spread','summerBridges','userPriority','summerHeavy','autumnHeavy','christmasHeavy','managerFriendly','avoidFragmentation','earlySummer','lateSummer','fallbackTemplate'];
-  if(avoidPeakHolidayPeriods) candidateStrategies.push('avoidPeakHolidays');
-  const strategyVariants=candidateStrategies.map(strategy=>{
-    if(outOfTime()) return null;
-    const periods=buildPlan(strategy);
-    return {strategy,periods,...scorePlan(periods,strategy)};
   });
-  const generatedGrid=generateStructuredCandidates().map(v=>({strategy:v.strategy,candidateId:v.candidateId,periods:v.periods,...scorePlan(v.periods,v.strategy)}));
-  const variants=[...strategyVariants.filter(Boolean),...generatedGrid];
-  const validVariants=variants.filter(Boolean);
-  const shapeValidCandidates=validVariants.filter(v=>v.shapeValidation?.isValid);
-  const pool=(shapeValidCandidates.length?shapeValidCandidates:validVariants);
-  function closePartialClusterScore(periods){
-    const sorted=[...periods].sort((a,b)=>a.start-b.start);
-    let bad=0;
-    for(let i=1;i<sorted.length;i++){
-      const a=sorted[i-1], b=sorted[i];
-      const gap=workdaysBetween(a,b,map);
-      const eitherPartial=(a.used>0&&a.used<5)||(b.used>0&&b.used<5);
-      if(eitherPartial && gap<5) bad++;
-      if(eitherPartial && gap<=2) bad+=2;
+
+  const e=easterSunday(year);
+  const asc=addDays(e,39);
+  const pin=addDays(e,50);
+
+  add(blocks,addDays(e,-4),addDays(e,1),'Påske 4+10');
+  add(blocks,addDays(e,-5),addDays(e,1),'Påske 5+11');
+  add(blocks,addDays(e,-2),addDays(e,1),'Påske kortbro');
+
+  add(blocks,new Date(year,3,30),new Date(year,4,3),'1. mai langhelg');
+  add(blocks,new Date(year,4,15),new Date(year,4,18),'17. mai langhelg');
+  add(blocks,addDays(asc,-1),addDays(asc,3),'Kristi himmelfart bro');
+  add(blocks,addDays(asc,0),addDays(asc,3),'Kristi himmelfart langhelg');
+  add(blocks,addDays(pin,-3),addDays(pin,0),'Pinsebro');
+
+  add(blocks,new Date(year,11,22),new Date(year+1,0,2),'Jul/nyttår hovedblokk');
+  add(blocks,new Date(year,11,24),new Date(year,11,31),'Jul/nyttår kort');
+
+  for(let d=new Date(year,0,1);d<=new Date(year,11,31);d=addDays(d,1)){
+    if(!okDate(d)) continue;
+
+    if(d.getDay()===1){
+      add(blocks,d,addDays(d,4),'Hel uke');
+      add(blocks,d,addDays(d,11),'To sammenhengende uker');
+      add(blocks,d,addDays(d,18),'Tre sammenhengende uker');
     }
-    return bad;
+
+    if(d.getDay()===4) add(blocks,d,addDays(d,3),'Torsdag–søndag');
+    if(d.getDay()===5) add(blocks,d,addDays(d,2),'Langhelg');
   }
-  function isReasonablePlan(v){
-    if(v.repeatedMiniBreakRejected) return false;
-    if(v.hardClusterViolation) return false;
-    if(!v.shapeValidation?.isValid) return false;
-    if((v.managerPattern?.periodCount||0)>=10) return false;
-    const partialCount=(v.periods||[]).filter(p=>p.used>0&&p.used<5).length;
-    const closePartial=closePartialClusterScore(v.periods||[]);
-    const vacDays=(v.periods||[]).flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>d.date));
-    const juneJuly=vacDays.filter(d=>d.getMonth()===5||d.getMonth()===6).length;
-    const juneJulyShare=juneJuly/Math.max(1,vacDays.length);
-    const juneJulyRedLeverage=(v.periods||[])
-      .flatMap(p=>p.days)
-      .filter(d=>((d.date.getMonth()===5||d.date.getMonth()===6) && (d.type==='holiday'||d.type==='special'))).length;
-    if(partialCount>=4) return false;
-    if(closePartial>=3) return false;
-    if(vacDays.length>=20 && juneJulyShare>0.58 && juneJulyRedLeverage<2) return false;
+
+  let unique=[...new Map(blocks.map(b=>[b.id,b])).values()];
+
+  unique=unique.filter(b=>{
+    if(seasonPref==='summer') return b.days.some(d=>d.date.getMonth()>=5&&d.date.getMonth()<=7)||b.efficiency>=2.5||b.type==='selected';
+    if(seasonPref==='spring') return b.days.some(d=>d.date.getMonth()>=2&&d.date.getMonth()<=4)||b.type==='selected';
+    if(seasonPref==='autumn') return b.days.some(d=>d.date.getMonth()>=8&&d.date.getMonth()<=10)||b.type==='selected';
+    return true;
+  });
+
+  unique.sort((a,b)=>{
+    const av=a.efficiency*100+a.total*5+a.redDayLeverage*18+(a.used>=5?30:0)+(a.type==='selected'?1000:0);
+    const bv=b.efficiency*100+b.total*5+b.redDayLeverage*18+(b.used>=5?30:0)+(b.type==='selected'?1000:0);
+    return bv-av;
+  });
+
+  return {blocks:unique,map};
+}
+
+function makeBridgeOverview(year){
+  const {blocks,map}=buildBlocks(year,25,{allowPast:false});
+  const bridges=blocks
+    .filter(b=>b.used>0&&b.used<=5&&b.total>=4&&b.efficiency>=1.6)
+    .sort((a,b)=>a.start-b.start||b.efficiency-a.efficiency);
+
+  return {
+    bridges,
+    map,
+    holidays:holidaysNO(year,document.getElementById('includeSpecial').checked).holidays
+  };
+}
+
+function plan(year,available,mode='balanced'){
+  const startedAt=performance.now();
+  const includeSpecial=document.getElementById('includeSpecial').checked;
+  const {holidays,map}=holidaysNO(year,includeSpecial);
+  const minContinuousWeeks=Number(document.getElementById('minContinuousWeeks').value||0);
+  const avoidPeak=document.getElementById('avoidPeakHolidayPeriods').checked;
+  const avoidSet=new Set([...dislikedDates]);
+  const seasonPref=season.value;
+
+  const MAX_PLANS=mode==='efficiency'?650:1100;
+  const MAX_RUNTIME=5200;
+
+  let evaluatedPlans=0;
+  let timedOut=false;
+
+  function outOfTime(){
+    if(performance.now()-startedAt>MAX_RUNTIME){
+      timedOut=true;
+      return true;
+    }
+    return false;
+  }
+
+  const {blocks}=buildBlocks(year,available,{avoidSet});
+
+  function overlapsAny(block,set){
+    return block.days.some(d=>set.has(dateKey(d.date)));
+  }
+
+  function addToPlan(plan,block,set){
+    if(overlapsAny(block,set)) return false;
+
+    const used=plan.reduce((s,p)=>s+p.used,0);
+    if(used+block.used>available) return false;
+
+    plan.push(block);
+    block.days.forEach(d=>set.add(dateKey(d.date)));
     return true;
   }
-  const byEfficiency=[...pool].sort((a,b)=>{
-    if((b.eff||0)!==(a.eff||0)) return (b.eff||0)-(a.eff||0);
-    if((b.free||0)!==(a.free||0)) return (b.free||0)-(a.free||0);
-    return (b.totalYearScore||b.score)-(a.totalYearScore||a.score);
-  });
-  const chosen=byEfficiency.find(isReasonablePlan) || byEfficiency[0];
 
-  let picked=[...chosen.periods];
-  let totalUsed=chosen.used;
-  let totalFree=chosen.free;
-  let left=chosen.unused;
-  if(left>0){
-    const usedSet=new Set(picked.flatMap(p=>p.days.map(d=>dateKey(d.date))));
-    const fillers=[...candidates].filter(c=>c.used>0 && c.used<=left && !c.days.some(d=>usedSet.has(dateKey(d.date)))).sort((a,b)=> (b.efficiency-a.efficiency) || (a.used-b.used));
-    fillers.forEach(f=>{
-      if(left<=0) return;
-      if(f.used>left) return;
-      if(f.days.some(d=>usedSet.has(dateKey(d.date)))) return;
-      if(f.days.some(d=>d.type==='vacation' && dislikedDates.has(dateKey(d.date)))) return;
-      if(dislikedDates.size>0){
-        const tooClose=picked.some(p=>workdaysBetween(p,f,map)<5);
-        if(tooClose) return;
-      }
-      picked.push({...f,chosenWhy:'post-fill'});
-      f.days.forEach(d=>usedSet.add(dateKey(d.date)));
-      totalUsed+=f.used; totalFree+=f.total; left-=f.used;
-    });
-    picked=picked.sort((a,b)=>a.start-b.start);
+  function randFactory(seed){
+    return ()=>{
+      seed=(seed*9301+49297)%233280;
+      return seed/233280;
+    };
   }
-  const strategyLabels={
-    balanced:'Anbefalt ferieplan',
-    leverage:'Smart helligdagsutnyttelse',
-    fullWeeks:'Mest fri for dagene',
-    spread:'Balansert ferieår',
-    summerBridges:'Smart helligdagsutnyttelse',
-    userPriority:'Anbefalt ferieplan'
-  };
-  const baseExplanation='Vi sammenlignet flere komplette ferieplaner og valgte den som ga best total balanse mellom lang sammenhengende fri, smart bruk av helligdager og god spredning gjennom året.';
-  const gapExplanation='Vi la inn litt tid tilbake på jobb mellom ferieperiodene der det ga mening, men beholdt sterke helligdagsbroer som ga mye fri for få feriedager.';
-  const skippedMayBridges=
-    (chosen.clusterWindowPenalty||0)+
-    (chosen.periodClusterPenalty||0)+
-    (chosen.concentrationWindowPenalty||0)+
-    (chosen.repeatedMiniBreakWindowPenalty||0)+
-    (chosen.extremeMiniBreakWindowPenalty||0) > 0;
-  const balanceExplanation='Vi hoppet over noen korte mai-broer for å gi en mer balansert ferieplan og en bedre hovedferie.';
-  const explanation=[
-    baseExplanation,
-    chosen.closeGapTouched?gapExplanation:'',
-    skippedMayBridges?balanceExplanation:''
-  ].filter(Boolean).join(' ');
-  const fallbackNote=timedOut?'Vi brukte en raskere plan fordi søket tok for lang tid.':'';
 
-  if(DEBUG_PLANNER){
-    const julyStartDebug=new Date(year,6,1);
-    const chosenVacationDays=picked.flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>d.date));
-    const beforeJulyCount=chosenVacationDays.filter(d=>d<julyStartDebug).length;
-    const percentVacationBeforeJuly1=(beforeJulyCount/Math.max(1,chosenVacationDays.length))*100;
-    const autumnStartDebug=new Date(year,8,1), autumnEndDebug=new Date(year,10,30);
-    const hasAutumnBreak=picked.some(p=>p.used>=2 && p.start<=autumnEndDebug && p.end>=autumnStartDebug);
-    plannerDebug('top-candidates', candidates.slice(0,20).map(c=>({reason:c.reason,type:c.type,used:c.used,total:c.total,eff:c.efficiency.toFixed(2),quality:c.quality})));
-    plannerDebug('chosen-candidates', picked.map(c=>({reason:c.reason,why:c.chosenWhy,used:c.used,total:c.total,eff:c.efficiency?.toFixed?.(2)})));
-    plannerDebug('rejected-candidates', candidates.filter(c=>!picked.some(p=>p.id===c.id)).slice(0,20).map(c=>({reason:c.reason,used:c.used,eff:c.efficiency.toFixed(2),why:'overlap or capacity or lower score'})));
-    plannerDebug('summary',{evaluatedPlans,totalEfficiency:(totalFree/Math.max(1,totalUsed)).toFixed(2),unusedDays:left,runtimeMs:Math.round(performance.now()-startedAt)});
-    plannerDebug('chosen-plan-periods', picked.map(p=>({
-      start:dateKey(p.start),
-      end:dateKey(p.end),
-      used:p.used,
-      free:p.total,
-      reason:p.reason
-    })));
-    plannerDebug('chosen-plan-clustering',{
-      hasSummerMainHoliday:Boolean(chosen.twoWeekMainHoliday),
-      hasAutumnBreak,
-      percentVacationBeforeJuly1:Number(percentVacationBeforeJuly1.toFixed(1)),
-      seasonCount:chosen.usedSeasons||0,
-      rolling45MaxPeriods:chosen.rolling45MaxPeriods||0,
-      mayMiniBreakCount:chosen.mayMiniBreakCount||0,
-      clusteringPenalty:chosen.clusteringPenalty||0,
-      hardClusterViolation:Boolean(chosen.hardClusterViolation),
-      managerApprovalPenalty:Number((chosen.managerApprovalPenalty||0).toFixed(2)),
-      totalSeparatePeriods:chosen.managerPattern?.periodCount||0,
-      maxConsecutiveWeeksWithVacation:chosen.managerPattern?.maxConsecutiveWeeks||0,
-      repeatedWeekdayPatternCount:chosen.managerPattern?.repeatedPatternCount||0,
-      periodsPer60DayWindow:(chosen.managerPattern?.rollingWindowCounts||[]).slice(0,8),
-      rejectedForRepeatedMiniBreaks:Boolean(chosen.repeatedMiniBreakRejected),
-      hasMainHoliday:Boolean(chosen.shapeValidation?.hasMainHoliday),
-      hasAutumnOrWinterBreak:Boolean(chosen.shapeValidation?.hasAutumnOrWinterBreak),
-      hasChristmasNewYearBlock:Boolean(chosen.shapeValidation?.hasChristmasNewYearBlock),
-      avoidPeakHolidayPeriods:Boolean(chosen.avoidPeakHolidayPeriods),
-      peakPeriodDaysIncluded:picked.flatMap(p=>p.days).filter(d=>periodTouchesPeak({days:[d],used:1})).length,
-      rejectedPlanReasons:chosen.shapeValidation?.reasons||[]
-    });
-    plannerDebug('chosen-final-score-breakdown',{
-      finalScore:Number((chosen.score||0).toFixed(2)),
-      closeGapPenalty:Number((chosen.closeGapPenalty||0).toFixed(2)),
-      repeatedPenalty:Number((chosen.repeatedPenalty||0).toFixed(2)),
-      workRhythmPenalty:Number((chosen.repeatedWorkRhythmPenalty||0).toFixed(2)),
-      rolling45Penalty:Number((chosen.repeatedMiniBreakWindowPenalty||0).toFixed(2)),
-      extremeWindowPenalty:Number((chosen.extremeMiniBreakWindowPenalty||0).toFixed(2)),
-      concentrationWindowPenalty:Number((chosen.concentrationWindowPenalty||0).toFixed(2)),
-      managerApprovalPenalty:Number((chosen.managerApprovalPenalty||0).toFixed(2)),
-      avoidedDatesCount:avoidedDates.size,
-      avoidedDatesUsed:chosen.avoidedDatesUsed||0,
-      avoidedDatesPenalty:chosen.avoidedDatesPenalty||0,
-      winnerAvoidedAllDisliked:(chosen.avoidedDatesUsed||0)===0,
-      whyWinner:'best structure/manager approval balance with efficiency maintained'
-    });
-    const comparisonTable=validVariants.map(v=>{ const vacDays=(v.periods||[]).flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>d.date)); const juneJuly=vacDays.filter(d=>d.getMonth()===5||d.getMonth()===6).length; return ({candidate:v.strategy,used:v.used,calendarDaysOff:v.free,periods:v.managerPattern?.periodCount||v.periods.length,partialWeeks:(v.periods||[]).filter(p=>p.used>0&&p.used<5).length,closePartialClusters:closePartialClusterScore(v.periods||[]),juneJulyShare:Number((juneJuly/Math.max(1,vacDays.length)).toFixed(2)),hasMainHoliday:Boolean(v.shapeValidation?.hasMainHoliday),hasAutumnOrWinterBreak:Boolean(v.shapeValidation?.hasAutumnOrWinterBreak),repeatedMiniBreakPenalty:Number((v.repeatedMiniBreakWindowPenalty||0).toFixed(2)),managerApprovalScore:Number((-(v.managerApprovalPenalty||0)).toFixed(2)),totalYearScore:Number(((v.totalYearScore||v.score)||0).toFixed(2)),rejectedReason:v.rejectedReason||'',winner:v.strategy===chosen.strategy});});
-    plannerDebug('candidate-comparison-table',comparisonTable);
-    plannerDebug('candidate-search-summary',{totalCandidatesGenerated:variants.length,totalCandidatesRejected:validVariants.filter(v=>!v.shapeValidation?.isValid).length,totalValidCandidates:validVariants.filter(v=>v.shapeValidation?.isValid).length,finalWinner:chosen.strategy,top10:[...validVariants].sort((a,b)=>(b.totalYearScore||b.score)-(a.totalYearScore||a.score)).slice(0,10).map(v=>({strategy:v.strategy,id:v.candidateId||v.strategy,totalYearScore:Number((v.totalYearScore||v.score).toFixed(2))}))});
-    const rejectedTop5=[...validVariants]
-      .filter(v=>v.strategy!==chosen.strategy)
-      .sort((a,b)=>b.score-a.score)
-      .slice(0,5)
-      .map(v=>({
-        strategy:v.strategy,
-        score:Number(v.score.toFixed(2)),
-        rolling45MaxPeriods:v.rolling45MaxPeriods||0,
-        mayMiniBreakCount:v.mayMiniBreakCount||0,
-        clusteringPenalty:Number((v.clusteringPenalty||0).toFixed(2)),
-        hardClusterViolation:Boolean(v.hardClusterViolation),
-        lostBecause:
-          (v.hardClusterViolation&&!chosen.hardClusterViolation)?'hard cluster violation without 7+ free-day gain':
-          ((v.clusteringPenalty||0)>(chosen.clusteringPenalty||0))?'higher clustering penalty':
-          'lower total score'
-      }));
-    plannerDebug('rejected-alternatives-top5', rejectedTop5);
-    if((chosen.mayMiniBreakCount||0)>3){
-      console.warn('[PLANNER] Warning: chosen plan still has high May/early-June mini-break clustering.',{
-        mayMiniBreakCount:chosen.mayMiniBreakCount,
-        rolling45MaxPeriods:chosen.rolling45MaxPeriods
+  function order(profile,seed){
+    let arr=[...blocks];
+    const rand=randFactory(seed);
+
+    if(mode==='efficiency'||profile==='efficient'){
+      arr.sort((a,b)=>b.efficiency-a.efficiency||b.total-a.total);
+    }else if(profile==='employer'){
+      arr.sort((a,b)=>{
+        const av=(a.used>=5?100:0)+a.total*3+a.efficiency*25-(a.used<5?26:0);
+        const bv=(b.used>=5?100:0)+b.total*3+b.efficiency*25-(b.used<5?26:0);
+        return bv-av;
+      });
+    }else if(profile==='fullWeeks'){
+      arr.sort((a,b)=>Number(b.used>=5)-Number(a.used>=5)||b.efficiency-a.efficiency);
+    }else if(profile==='lowFragmentation'){
+      arr.sort((a,b)=>b.used-a.used||b.efficiency-a.efficiency);
+    }else if(profile==='autumnIncluded'){
+      arr.sort((a,b)=>{
+        const av=a.days.some(d=>d.date.getMonth()>=8&&d.date.getMonth()<=10);
+        const bv=b.days.some(d=>d.date.getMonth()>=8&&d.date.getMonth()<=10);
+        return Number(bv)-Number(av)||b.efficiency-a.efficiency;
+      });
+    }else if(profile==='winterIncluded'){
+      arr.sort((a,b)=>{
+        const av=a.days.some(d=>d.date.getMonth()<=1||d.date.getMonth()===11);
+        const bv=b.days.some(d=>d.date.getMonth()<=1||d.date.getMonth()===11);
+        return Number(bv)-Number(av)||b.efficiency-a.efficiency;
+      });
+    }else if(profile==='avoidPeak'){
+      arr.sort((a,b)=>Number(periodTouchesPeak(a))-Number(periodTouchesPeak(b))||b.efficiency-a.efficiency);
+    }else{
+      arr=arr.map(item=>{
+        let weight=item.efficiency*2.3+item.total*.14+item.redDayLeverage*.55+(item.used>=5?1.1:0)+(item.type==='selected'?8:0);
+
+        if(seasonPref==='all'&&item.used>=5&&item.days.some(d=>d.date.getMonth()>=5&&d.date.getMonth()<=7)) weight-=.18;
+        if(seasonPref==='summer'&&item.days.some(d=>d.date.getMonth()>=5&&d.date.getMonth()<=7)) weight+=2.4;
+        if(seasonPref==='xmas'&&item.type==='christmas') weight+=3.5;
+        if(avoidPeak&&periodTouchesPeak(item)&&item.type!=='selected') weight-=3.8;
+
+        return {item,sort:rand()/Math.max(.1,weight)};
+      }).sort((a,b)=>a.sort-b.sort).map(x=>x.item);
+    }
+
+    return arr;
+  }
+
+  function buildPlans(){
+    const profiles=mode==='efficiency'
+      ? ['efficient','efficient','efficient','balanced']
+      : ['balanced','efficient','spread','employer','fullWeeks','lowFragmentation','autumnIncluded','winterIncluded','avoidPeak','balanced','spread','employer'];
+
+    const plans=[];
+
+    for(let i=0;i<MAX_PLANS&&!outOfTime();i++){
+      const profile=profiles[i%profiles.length];
+      const ordered=order(profile,1000+i*17);
+      const periods=[];
+      const usedSet=new Set();
+
+      blocks.filter(b=>b.type==='selected').forEach(b=>addToPlan(periods,b,usedSet));
+
+      for(const b of ordered){
+        const used=periods.reduce((s,p)=>s+p.used,0);
+        const left=available-used;
+
+        if(left<=0) break;
+        if(b.used>left) continue;
+
+        if(mode!=='efficiency'&&profile==='lowFragmentation'&&b.used<5&&left>8) continue;
+        if(mode!=='efficiency'&&profile==='employer'&&b.used<=2&&left>6&&b.efficiency<2.5) continue;
+
+        addToPlan(periods,b,usedSet);
+      }
+
+      if(periods.length){
+        plans.push({profile,periods:periods.sort((a,b)=>a.start-b.start)});
+      }
+    }
+
+    return plans;
+  }
+
+  function countClosePartialClusters(periods){
+    let bad=0;
+
+    for(let i=1;i<periods.length;i++){
+      const gap=workdaysBetween(periods[i-1],periods[i],map);
+      const either=periods[i-1].used<5||periods[i].used<5;
+
+      if(either&&gap<5) bad++;
+      if(either&&gap<=2) bad+=2;
+    }
+
+    return bad;
+  }
+
+  function scorePlan(o){
+    evaluatedPlans++;
+
+    const periods=o.periods;
+    const used=periods.reduce((s,p)=>s+p.used,0);
+    const free=periods.reduce((s,p)=>s+p.total,0);
+    const gained=free-used;
+    const eff=free/Math.max(1,used);
+    const unused=Math.max(0,available-used);
+    const vacDays=periods.flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>d.date));
+    const seasonBuckets={spring:0,summer:0,autumn:0,winter:0};
+
+    vacDays.forEach(d=>seasonBuckets[seasonForDate(d)]++);
+
+    const usedSeasons=Object.values(seasonBuckets).filter(Boolean).length;
+    const dominant=used?Math.max(...Object.values(seasonBuckets))/used:1;
+    const months=new Set(vacDays.map(d=>d.getMonth())).size;
+    const fullWeeks=periods.filter(p=>p.used>=5).length;
+    const partialWeeks=periods.filter(p=>p.used>0&&p.used<5).length;
+    const periodCount=periods.length;
+    const largest=Math.max(0,...periods.map(p=>p.used));
+
+    let score=0;
+
+    if(mode==='efficiency'){
+      score+=eff*900+free*28+gained*22;
+      if(unused===0) score+=120;
+      else score-=unused*95;
+      score-=periodCount*4;
+    }else{
+      score+=eff*150+free*8+gained*9;
+
+      if(unused===0) score+=100;
+      else if(unused<=2) score-=unused*36;
+      else score-=unused*125;
+
+      score+=fullWeeks*58;
+      score-=partialWeeks*24;
+      score-=Math.max(0,periodCount-6)*58;
+      score-=Math.max(0,periodCount-8)*135;
+
+      if(used>=20&&largest>used*.62&&seasonPref==='all'){
+        score-=(largest-used*.62)*26;
+      }
+
+      if(seasonPref==='all'){
+        score+=usedSeasons*45+months*12;
+
+        if(used>=20&&usedSeasons>=3) score+=140;
+        if(used>=20&&usedSeasons<3) score-=190;
+
+        if(dominant>.55) score-=270+(dominant-.55)*920;
+
+        const beforeSept=vacDays.filter(d=>d<new Date(year,8,1)).length/Math.max(1,vacDays.length);
+        if(beforeSept>.75) score-=190+(beforeSept-.75)*620;
+      }
+
+      if(seasonPref==='summer'){
+        score+=seasonBuckets.summer*24;
+        if(seasonBuckets.summer<Math.min(10,used*.4)) score-=180;
+      }
+
+      if(seasonPref==='spring'){
+        score+=seasonBuckets.spring*24;
+        if(seasonBuckets.spring<Math.min(8,used*.35)) score-=150;
+      }
+
+      if(seasonPref==='autumn'){
+        score+=seasonBuckets.autumn*24;
+        if(seasonBuckets.autumn<Math.min(8,used*.35)) score-=150;
+      }
+
+      if(seasonPref==='xmas'){
+        const hasX=periods.some(p=>p.type==='christmas');
+        score+=hasX?190:-190;
+        if(usedSeasons>=2) score+=60;
+      }
+
+      if(used>=20&&seasonPref==='all'){
+        if(seasonBuckets.autumn>=4) score+=125;
+        else if(seasonBuckets.autumn>=2) score+=60;
+        else score-=140;
+
+        if(seasonBuckets.winter>=2) score+=45;
+      }
+
+      let closeGapPenalty=0;
+      let miniClusterPenalty=0;
+
+      for(let i=1;i<periods.length;i++){
+        const gap=workdaysBetween(periods[i-1],periods[i],map);
+        const either=periods[i-1].used<5||periods[i].used<5;
+
+        if(gap===0) closeGapPenalty+=90;
+        else if(gap<=2) closeGapPenalty+=either?86:45;
+        else if(gap<=4) closeGapPenalty+=either?46:20;
+      }
+
+      for(let i=0;i<periods.length;i++){
+        const start=periods[i].start;
+        const end45=addDays(start,44);
+        const in45=periods.filter(p=>p.start<=end45&&p.end>=start);
+        const mini=in45.filter(p=>p.used<5);
+
+        if(in45.length>3) miniClusterPenalty+=(in45.length-3)*98;
+        if(mini.length>2) miniClusterPenalty+=(mini.length-2)*125;
+      }
+
+      score-=closeGapPenalty+miniClusterPenalty;
+      score-=countClosePartialClusters(periods)*38;
+    }
+
+    if(avoidPeak){
+      periods.forEach(p=>{
+        if(periodTouchesPeak(p)&&p.type!=='selected'){
+          score-=mode==='efficiency'?30:(p.used>=5?275:130);
+        }
       });
     }
+
+    const avoidedUsed=periods
+      .flatMap(p=>p.days)
+      .filter(d=>d.type==='vacation'&&avoidSet.has(dateKey(d.date)))
+      .length;
+
+    score-=avoidedUsed*1000;
+
+    const selectedCovered=periods.reduce((s,p)=>s+selectedOverlap(p),0);
+
+    if(selectedDates.size){
+      score+=selectedCovered*(mode==='efficiency'?40:95);
+      score-=Math.max(0,selectedDates.size-selectedCovered)*185;
+    }
+
+    if(minContinuousWeeks>0){
+      const req=minContinuousWeeks*5;
+      score+=periods.some(p=>p.used>=req)?165:-270;
+    }
+
+    score+=periods.filter(p=>p.clean).length*(mode==='efficiency'?3:14);
+
+    return {
+      ...o,
+      score,
+      used,
+      free,
+      gained,
+      eff,
+      unused,
+      seasonBuckets,
+      usedSeasons,
+      months,
+      fullWeeks,
+      partialWeeks,
+      periodCount,
+      avoidedUsed
+    };
   }
 
-  const highConcentrationWarning=(chosen.concentrationWindowPenalty||0)>0?'Planen fordeler ferien mer utover året for å unngå for stor konsentrasjon i én kort periode.':'';
-  return {picked,left,totalUsed,totalFree,totalGained:totalFree-totalUsed,eff:totalFree/Math.max(totalUsed,1),holidays,errors:preferred.errors,metrics:{fullCount:picked.filter(p=>p.used>=5).length,partialCount:Math.max(0,picked.filter(p=>!p.clean).length),closeGapPenalty:chosen.closeGapPenalty||0,repeatedPenalty:chosen.repeatedPenalty||0,repeatedWorkRhythmPenalty:chosen.repeatedWorkRhythmPenalty||0,repeatedMiniBreakWindowPenalty:chosen.repeatedMiniBreakWindowPenalty||0,extremeMiniBreakWindowPenalty:chosen.extremeMiniBreakWindowPenalty||0,mainHoliday:chosen.twoWeekMainHoliday||false},explanation,leftoverExplanation:left>0?`${left} dag(er) ble stående igjen. Prøv "Beregn på nytt" eller juster preferanser for å bruke flere dager.`:'Alle tilgjengelige feriedager ble brukt.',qualityLabel:strategyLabels[chosen.strategy]||'Anbefalt ferieplan',highConcentrationWarning,fallbackNote};
+  const scored=buildPlans().map(scorePlan).sort((a,b)=>b.score-a.score);
+  const chosen=scored[0];
+
+  if(!chosen){
+    return {
+      picked:[],
+      left:available,
+      totalUsed:0,
+      totalFree:0,
+      totalGained:0,
+      eff:0,
+      holidays,
+      errors:['Fant ingen gyldig ferieplan.'],
+      metrics:{fullCount:0,partialCount:0},
+      explanation:'',
+      leftoverExplanation:'',
+      qualityLabel:'Ingen plan funnet',
+      highConcentrationWarning:'',
+      fallbackNote:''
+    };
+  }
+
+  plannerDebug('summary',{
+    mode,
+    blocksGenerated:blocks.length,
+    plansEvaluated:evaluatedPlans,
+    timedOut,
+    chosenScore:Number(chosen.score.toFixed(2)),
+    chosenProfile:chosen.profile,
+    used:chosen.used,
+    free:chosen.free,
+    efficiency:Number(chosen.eff.toFixed(2)),
+    seasons:chosen.seasonBuckets,
+    periodCount:chosen.periodCount,
+    fullWeeks:chosen.fullWeeks,
+    partialWeeks:chosen.partialWeeks
+  });
+
+  plannerDebug('top-10-plans',scored.slice(0,10).map(p=>({
+    profile:p.profile,
+    score:Number(p.score.toFixed(2)),
+    used:p.used,
+    free:p.free,
+    eff:Number(p.eff.toFixed(2)),
+    periods:p.periodCount,
+    fullWeeks:p.fullWeeks,
+    partialWeeks:p.partialWeeks,
+    seasons:p.seasonBuckets
+  })));
+
+  const picked=chosen.periods;
+  const totalUsed=chosen.used;
+  const totalFree=chosen.free;
+  const left=chosen.unused;
+
+  const seasonParts=Object.entries(chosen.seasonBuckets)
+    .filter(([,v])=>v>0)
+    .map(([k,v])=>`${seasonLabel(k)} ${v}`)
+    .join(' • ');
+
+  const explanation=mode==='efficiency'
+    ? `Dette er maks effektivitet-modus. Vi vektet kalenderdager fri per feriedag mye høyere enn normal balanse. Fordeling: ${seasonParts}.`
+    : `Vi sammenlignet ${evaluatedPlans} realistiske ferieår og valgte planen med best balanse mellom høy effektivitet, god spredning og arbeidsgiver-vennlig struktur. Fordeling: ${seasonParts}.`;
+
+  return {
+    picked,
+    left,
+    totalUsed,
+    totalFree,
+    totalGained:totalFree-totalUsed,
+    eff:totalFree/Math.max(totalUsed,1),
+    holidays,
+    errors:[],
+    metrics:{
+      fullCount:chosen.fullWeeks,
+      partialCount:chosen.partialWeeks,
+      plansEvaluated:evaluatedPlans,
+      mainHoliday:picked.some(p=>p.used>=10)
+    },
+    explanation,
+    leftoverExplanation:left>0
+      ? `${left} dag(er) ble stående igjen fordi de ga dårligere totalplan eller kolliderte med valgte/unngåtte perioder.`
+      : 'Alle tilgjengelige feriedager ble brukt.',
+    qualityLabel:mode==='efficiency'?'Maks effektivitet på gøy':'Anbefalt balansert ferieplan',
+    highConcentrationWarning:chosen.usedSeasons<3&&seasonPref==='all'&&available>=20&&mode!=='efficiency'
+      ? 'Planen har fortsatt noe konsentrasjon i få deler av året, men dette var beste balanse blant alternativene som ble testet.'
+      : '',
+    fallbackNote:timedOut?'Søket stoppet tidlig for å holde appen rask, men sammenlignet likevel flere alternativer.':''
+  };
 }
-const formatDate=d=>`${d.getDate()}. ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
-function isDateInsidePeriod(date, period){
-  return date >= period.start && date <= period.end;
+
+function isDateInsidePeriod(date,period){
+  return date>=period.start&&date<=period.end;
 }
-function isDatePaidVacation(date, planPeriods){
-  return planPeriods.some(p=>p.days.some(day=>day.type==='vacation' && dateKey(day.date)===dateKey(date)));
+
+function isDatePaidVacation(date,planPeriods){
+  return planPeriods.some(p=>p.days.some(day=>day.type==='vacation'&&dateKey(day.date)===dateKey(date)));
 }
-function getResultDayClass(date, planPeriods, holidayMap){
-  // Visual test cases:
-  // 1) Thu–Sun period with Thu/Fri vacation => Sat/Sun become vacation-connected-weekend.
-  // 2) Mon–Fri period => preceding Sat/Sun stay normal-weekend unless period actually includes them.
-  // 3) Fri–Mon period => Sat/Sun inside period become vacation-connected-weekend.
-  // 4) Isolated weekend with no period overlap => normal-weekend.
+
+function getResultDayClass(date,planPeriods,holidayMap){
   const key=dateKey(date);
   const holiday=holidayMap[key];
-  if(holiday) return holiday.includes('spesialdag') ? 'special-day' : 'holiday';
+
+  if(holiday) return holiday.includes('spesialdag')?'special-day':'holiday';
+
   const weekend=isWeekend(date);
-  const paidVacation=isDatePaidVacation(date, planPeriods);
+  const paidVacation=isDatePaidVacation(date,planPeriods);
+
   if(paidVacation) return 'vacation-used';
+
   if(weekend){
     const containingPeriod=planPeriods.find(p=>isDateInsidePeriod(date,p));
+
     if(containingPeriod){
-      const reason='insidePeriod';
-      calendarDebug('connected-weekend', {date:key, period:`${dateKey(containingPeriod.start)}..${dateKey(containingPeriod.end)}`, reason});
+      calendarDebug('connected-weekend',{date:key,period:`${dateKey(containingPeriod.start)}..${dateKey(containingPeriod.end)}`});
       return 'vacation-connected-weekend';
     }
+
     return 'normal-weekend';
   }
+
   return 'normal-day';
 }
-async function runPlanner(){const year=Number(document.getElementById('year').value),days=Number(document.getElementById('days').value),transferDays=Number(document.getElementById('transferDays').value||0),out=document.getElementById('result');
-const button=document.querySelector('button[onclick="runPlanner()"]');
-const overlay=document.getElementById('loadingOverlay');
-const spinnerDelayMs=150;
-const minVisibleMs=500;
-let isLoading=false;
-let isSpinnerVisible=false;
-let spinnerShownAt=0;
-let delayTimer=null;
-let subtextTimer=null;
-const startedAt=performance.now();
-const subtexts=['Ser på helligdager','Tester broer og langhelger','Sammenligner ferieplaner'];
-let subtextIndex=0;
-function startLoadingUi(){
-  setLoading(true);
-  const subtextNode=document.getElementById('loadingSubtext');
-  if(subtextNode){
-    subtextNode.textContent=subtexts[0];
-    subtextTimer=setInterval(()=>{
-      subtextIndex=(subtextIndex+1)%subtexts.length;
-      subtextNode.textContent=subtexts[subtextIndex];
-    },300);
+
+async function runPlanner(mode='balanced'){
+  const year=Number(document.getElementById('year').value);
+  const days=Number(document.getElementById('days').value);
+  const transferDays=Number(document.getElementById('transferDays').value||0);
+  const out=document.getElementById('result');
+  const buttons=[...document.querySelectorAll('button[onclick^="runPlanner"]')];
+  const overlay=document.getElementById('loadingOverlay');
+
+  const subtexts=[
+    'Tester ferieblokker',
+    'Bygger helårsplaner',
+    'Sammenligner effektivitet og spredning',
+    'Sjekker arbeidsgiver-vennlig struktur'
+  ];
+
+  let idx=0;
+  let timer=null;
+
+  function show(){
+    buttons.forEach(b=>{
+      b.disabled=true;
+      b.setAttribute('aria-busy','true');
+    });
+
+    overlay?.classList.add('visible');
+    overlay?.setAttribute('aria-hidden','false');
+
+    const sub=document.getElementById('loadingSubtext');
+
+    if(sub){
+      sub.textContent=days===0?'Finner smarte broer':subtexts[0];
+      timer=setInterval(()=>{
+        idx=(idx+1)%subtexts.length;
+        sub.textContent=days===0?'Finner smarte broer':subtexts[idx];
+      },420);
+    }
   }
-  if(FORCE_LOADING_PREVIEW){
-    showSpinner();
-  } else {
-    delayTimer=setTimeout(()=>{ if(isLoading) showSpinner(); },spinnerDelayMs);
+
+  function hide(){
+    if(timer) clearInterval(timer);
+
+    buttons.forEach(b=>{
+      b.disabled=false;
+      b.setAttribute('aria-busy','false');
+    });
+
+    overlay?.classList.remove('visible');
+    overlay?.setAttribute('aria-hidden','true');
   }
-}
-function stopLoadingUi(){
-  if(delayTimer){ clearTimeout(delayTimer); }
-  if(subtextTimer){ clearInterval(subtextTimer); subtextTimer=null; }
-  setLoading(false);
-  const forcedPreview=FORCE_LOADING_PREVIEW?Math.max(0,700-(performance.now()-startedAt)):0;
-  const remaining=isSpinnerVisible?Math.max(0,minVisibleMs-(performance.now()-spinnerShownAt)):0;
-  setTimeout(()=>{
-    setTimeout(()=>{
-      hideSpinner();
-      loadingDebug('loading stopped');
-    },remaining);
-  },forcedPreview);
-}
-function setLoading(next){
-  isLoading=!!next;
-  if(button){ button.disabled=isLoading; button.setAttribute('aria-busy',isLoading?'true':'false'); }
-}
-function showSpinner(){
-  if(!overlay || isSpinnerVisible || !isLoading) return;
-  overlay.classList.add('visible');
-  overlay.setAttribute('aria-hidden','false');
-  isSpinnerVisible=true;
-  spinnerShownAt=performance.now();
-  loadingDebug('spinner shown');
-}
-function hideSpinner(){
-  if(!overlay || !isSpinnerVisible) return;
-  overlay.style.transitionDuration='200ms';
-  overlay.classList.remove('visible');
-  overlay.setAttribute('aria-hidden','true');
-  isSpinnerVisible=false;
-}
-loadingDebug('planner started');
-try{
-startLoadingUi();
-await new Promise(requestAnimationFrame);
-if(!days||days<1){out.innerHTML='<section class="card">Legg inn minst 1 feriedag.</section>'; return;} if(transferDays<0||transferDays>days){out.innerHTML=`<section class="card">Overføringsdager må være mellom 0 og ${days}.</section>`; return;} const available=Math.max(0,days-transferDays); const res=plan(year,available);
-if(!res||!Array.isArray(res.picked)){ throw new Error('Planner returned invalid result'); }
-if(res.picked.length===0){
-  out.innerHTML='<section class="card">Fant ingen gyldig ferieplan.</section>';
-  return;
-}
-const durationMs=Math.round(performance.now()-startedAt);
-loadingDebug(`planner finished in ${durationMs} ms`);
-const summaryCards=[
-  {label:'Feriedager', value:String(days)},
-  {label:'Overføres', value:String(transferDays)},
-  ...(res.totalUsed===available?[]:[{label:'Brukt i planen', value:String(res.totalUsed)}]),
-  {label:'Ubrukt', value:String(res.left)},
-  {label:'Hele uker', value:String(res.metrics.fullCount)},
-  {label:'Delvise uker', value:String(res.metrics.partialCount)},
-  {label:'Dager fri totalt', value:String(res.totalFree)},
-  {label:'Effektivitet', value:`${res.eff.toFixed(2)}x`}
-];
-const transferText=transferDays>0?`<p class="summary-help">${transferDays} feriedager holdes av til neste år.</p>`:'';
-const {map:resultHolidayMap}=holidaysNO(year,document.getElementById('includeSpecial').checked);
-out.innerHTML=`<section class="card"><h2>Resultat</h2><p class="reason">${res.qualityLabel}</p><p class="muted">${res.explanation}</p>
-<div class="summary">${summaryCards.map(card=>`<div class="box"><strong>${card.value}</strong><span>${card.label}</span></div>`).join('')}</div>
-<p class="summary-help">Effektivitet viser hvor mange kalenderdager fri du får per brukt feriedag.</p>
-${transferText}
-${res.errors.length?`<p class="muted">Merknad: ${res.errors.join(' ')}</p>`:''}
-${res.fallbackNote?`<p class="muted">${res.fallbackNote}</p>`:''}${res.highConcentrationWarning?`<p class="muted">${res.highConcentrationWarning}</p>`:''}
-<p class="muted">${res.leftoverExplanation}</p>
-<p class="muted">${res.metrics.partialCount===0?'Planen unngikk delvise uker og prioriterte hele ferieuker.':'Noen delvise uker ble beholdt for å koble ferie mot helg/helligdager og fortsatt gi høy ferieeffekt.'}</p>
-<div class="legend"><span class="pill vacation">Feriedag</span><span class="pill weekend">Helg</span><span class="pill holiday">Helligdag</span><span class="pill special">Spesialdag</span></div></section>
-${res.picked.map((p,i)=>`<section class="card period"><h2>${i+1}. ${formatDate(p.start)} – ${formatDate(p.end)}</h2><span class="reason">${p.reason}</span><p class="muted">${p.used} feriedager brukt • ${p.total} dager fri • ${p.gained} ekstra dager</p><div class="timeline">${p.days.map(d=>{const c=getResultDayClass(d.date,res.picked,resultHolidayMap);const pill=(c==='vacation-used'||c==='vacation-connected-weekend')?'vacation':(c==='normal-weekend'?'weekend':(c==='special-day'?'special':(c==='holiday'?'holiday':'')));return `<span class="pill ${pill}">${dayNames[d.date.getDay()]} ${d.date.getDate()}. ${monthNames[d.date.getMonth()]}</span>`;}).join('')}</div></section>`).join('')}
-<section class="card"><h2>Norske helligdager ${year}</h2>${res.holidays.sort((a,b)=>a.date-b.date).map(h=>`<div class="holiday-row"><strong>${formatDate(h.date)}</strong><span>${h.name}</span></div>`).join('')}</section>`;
-latestPlanPeriods=res.picked; latestPlanYear=year;
-renderResultCalendar(year, res.picked);
-updateRecalculateUi();
-} catch(err){
-  console.error(err);
-  plannerDebug('runPlanner error',err);
-  out.innerHTML='<section class="card">Planlegging feilet. Prøv igjen.</section>';
-} finally{
-  stopLoadingUi();
-}
+
+  try{
+    show();
+    await new Promise(requestAnimationFrame);
+
+    if(days<0||isNaN(days)){
+      out.innerHTML='<section class="card">Legg inn 0 eller flere feriedager.</section>';
+      return;
+    }
+
+    if(transferDays<0||transferDays>days){
+      out.innerHTML=`<section class="card">Overføringsdager må være mellom 0 og ${days}.</section>`;
+      return;
+    }
+
+    if(season.value==='custom'){
+      const start=document.getElementById('customStart').value;
+      const end=document.getElementById('customEnd').value;
+
+      if(!start||!end){
+        out.innerHTML='<section class="card">Velg både startdato og sluttdato for egendefinert periode.</section>';
+        return;
+      }
+    }
+
+    if(days===0){
+      renderBridgeOverview(year);
+      return;
+    }
+
+    const available=Math.max(0,days-transferDays);
+    const res=plan(year,available,mode);
+
+    if(!res?.picked?.length){
+      out.innerHTML='<section class="card">Fant ingen gyldig ferieplan.</section>';
+      return;
+    }
+
+    const summaryCards=[
+      {label:'Feriedager',value:String(days)},
+      {label:'Overføres',value:String(transferDays)},
+      ...(res.totalUsed===available?[]:[{label:'Brukt i planen',value:String(res.totalUsed)}]),
+      {label:'Ubrukt',value:String(res.left)},
+      {label:'Hele uker',value:String(res.metrics.fullCount)},
+      {label:'Delvise uker',value:String(res.metrics.partialCount)},
+      {label:'Dager fri totalt',value:String(res.totalFree)},
+      {label:'Effektivitet',value:`${res.eff.toFixed(2)}x`}
+    ];
+
+    const transferText=transferDays>0
+      ? `<p class="summary-help">${transferDays} feriedager holdes av til neste år.</p>`
+      : '';
+
+    const {map:resultHolidayMap}=holidaysNO(year,document.getElementById('includeSpecial').checked);
+
+    out.innerHTML=`
+      <section class="card">
+        <h2>Resultat</h2>
+        <p class="reason">${res.qualityLabel}</p>
+        <p class="muted">${res.explanation}</p>
+
+        <div class="summary">
+          ${summaryCards.map(c=>`
+            <div class="box">
+              <strong>${c.value}</strong>
+              <span>${c.label}</span>
+            </div>
+          `).join('')}
+        </div>
+
+        <p class="summary-help">Effektivitet viser hvor mange kalenderdager fri du får per brukt feriedag. Vanlig ferieplan velges ut fra hele ferieåret, ikke bare høyest effektivitet.</p>
+        ${transferText}
+        ${res.fallbackNote?`<p class="muted">${res.fallbackNote}</p>`:''}
+        ${res.highConcentrationWarning?`<p class="muted">${res.highConcentrationWarning}</p>`:''}
+        <p class="muted">${res.leftoverExplanation}</p>
+        <p class="muted">${res.metrics.partialCount===0?'Planen unngikk delvise uker og prioriterte hele ferieuker.':'Noen delvise uker ble beholdt fordi de gir høy ferieeffekt uten å ødelegge helårsstrukturen.'}</p>
+
+        <div class="legend">
+          <span class="pill vacation">Feriedag</span>
+          <span class="pill weekend">Helg</span>
+          <span class="pill holiday">Helligdag</span>
+          <span class="pill special">Spesialdag</span>
+        </div>
+      </section>
+
+      ${res.picked.map((p,i)=>`
+        <section class="card period">
+          <h2>${i+1}. ${formatDate(p.start)} – ${formatDate(p.end)}</h2>
+          <span class="reason">${p.reason}</span>
+          <p class="muted">${p.used} feriedager brukt • ${p.total} dager fri • ${p.gained} ekstra dager • ${(p.efficiency||p.total/Math.max(1,p.used)).toFixed(2)}x</p>
+          <div class="timeline">
+            ${p.days.map(d=>{
+              const c=getResultDayClass(d.date,res.picked,resultHolidayMap);
+              const pill=(c==='vacation-used'||c==='vacation-connected-weekend')
+                ? 'vacation'
+                : (c==='normal-weekend'
+                  ? 'weekend'
+                  : (c==='special-day'
+                    ? 'special'
+                    : (c==='holiday'?'holiday':'')));
+
+              return `<span class="pill ${pill}">${dayNames[d.date.getDay()]} ${d.date.getDate()}. ${monthNames[d.date.getMonth()]}</span>`;
+            }).join('')}
+          </div>
+        </section>
+      `).join('')}
+
+      <section class="card">
+        <h2>Norske helligdager ${year}</h2>
+        ${res.holidays.sort((a,b)=>a.date-b.date).map(h=>`
+          <div class="holiday-row">
+            <strong>${formatDate(h.date)}</strong>
+            <span>${h.name}</span>
+          </div>
+        `).join('')}
+      </section>
+    `;
+
+    latestPlanPeriods=res.picked;
+    latestPlanYear=year;
+
+    renderResultCalendar(year,res.picked);
+    updateRecalculateUi();
+
+  }catch(err){
+    console.error(err);
+    plannerDebug('runPlanner error',err);
+    out.innerHTML='<section class="card">Planlegging feilet. Prøv igjen.</section>';
+  }finally{
+    hide();
+  }
 }
 
-function renderResultCalendar(year, planPeriods){
+function renderBridgeOverview(year){
+  const out=document.getElementById('result');
+  const {bridges,holidays}=makeBridgeOverview(year);
+
+  latestPlanPeriods=[];
+  updateRecalculateUi();
+
+  out.innerHTML=`
+    <section class="card">
+      <h2>Smarte broer ${year}</h2>
+      <p class="reason">Oversikt uten ferieplan</p>
+      <p class="muted">Du skrev 0 feriedager, så appen viser smarte muligheter gjennom året i stedet for å velge en plan. Dette er fine perioder å vurdere hvis du senere legger inn feriedager.</p>
+
+      <div class="summary">
+        <div class="box"><strong>${bridges.length}</strong><span>Broer funnet</span></div>
+        <div class="box"><strong>${bridges[0]?.efficiency?.toFixed(2)||'0.00'}x</strong><span>Beste effektivitet</span></div>
+        <div class="box"><strong>${bridges.filter(b=>b.redDayLeverage>0).length}</strong><span>Med helligdag</span></div>
+        <div class="box"><strong>${bridges.filter(b=>b.used<=2).length}</strong><span>1–2 feriedager</span></div>
+      </div>
+
+      <p class="summary-help">Sortert kronologisk. Effektivitet = kalenderdager fri delt på feriedager brukt.</p>
+    </section>
+
+    ${bridges.map((p,i)=>`
+      <section class="card period">
+        <h2>${i+1}. ${formatDate(p.start)} – ${formatDate(p.end)}</h2>
+        <span class="reason">${p.reason}</span>
+        <p class="muted">Krever ${p.used} feriedag(er) • gir ${p.total} dager fri • ${p.gained} ekstra dager • ${p.efficiency.toFixed(2)}x</p>
+        <div class="timeline">
+          ${p.days.map(d=>`
+            <span class="pill ${d.type==='vacation'?'vacation':d.type==='weekend'?'weekend':d.type==='special'?'special':'holiday'}">
+              ${dayNames[d.date.getDay()]} ${d.date.getDate()}. ${monthNames[d.date.getMonth()]}
+            </span>
+          `).join('')}
+        </div>
+      </section>
+    `).join('')}
+
+    <section class="card">
+      <h2>Norske helligdager ${year}</h2>
+      ${holidays.sort((a,b)=>a.date-b.date).map(h=>`
+        <div class="holiday-row">
+          <strong>${formatDate(h.date)}</strong>
+          <span>${h.name}</span>
+        </div>
+      `).join('')}
+    </section>
+  `;
+}
+
+function renderResultCalendar(year,planPeriods){
   const {map}=holidaysNO(year,document.getElementById('includeSpecial').checked);
-  const html = Array.from({length:12},(_,month)=>{
+
+  const html=Array.from({length:12},(_,month)=>{
     const first=new Date(year,month,1);
     const last=new Date(year,month+1,0);
     const offset=(first.getDay()+6)%7;
-    let body='<div class="calendar-grid">'+['man','tir','ons','tor','fre','lør','søn'].map(d=>`<div class="weekday-head">${d}</div>`).join('')+'</div><div class="calendar-grid">';
-    for(let i=0;i<offset;i++) body += '<div class="calendar-day empty"></div>';
+
+    let body='<div class="calendar-grid">'+
+      ['man','tir','ons','tor','fre','lør','søn'].map(d=>`<div class="weekday-head">${d}</div>`).join('')+
+      '</div><div class="calendar-grid">';
+
+    for(let i=0;i<offset;i++) body+='<div class="calendar-day empty"></div>';
+
     for(let day=1;day<=last.getDate();day++){
       const d=new Date(year,month,day);
       const cls=['calendar-day'];
-      const visualClass=getResultDayClass(d,planPeriods,map);
-      if(visualClass==='vacation-used') cls.push('result-vacation-used');
-      else if(visualClass==='vacation-connected-weekend') cls.push('result-vacation-connected-weekend');
-      else if(visualClass==='holiday') cls.push('holiday');
-      else if(visualClass==='special-day') cls.push('special');
-      else if(visualClass==='normal-weekend') cls.push('weekend');
-      else cls.push('normal-day');
-      const k=dateKey(d);
-      if(dislikedDates.has(k) && (visualClass==='vacation-used'||visualClass==='vacation-connected-weekend')) cls.push('disliked');
-      const clickable=(visualClass==='vacation-used'||visualClass==='vacation-connected-weekend');
-      body += clickable ? `<button type="button" class="${cls.join(' ')}" onclick="toggleDislikedDate('${k}')">${day}</button>` : `<div class="${cls.join(' ')}">${day}</div>`;
-    }
-    body+='</div>';
-    return `<section class="card" style="margin-bottom:8px;"><h3 style="margin:0 0 8px;">${monthNames[month]} ${year}</h3>${body}</section>`;
-  }).join('');
-  const existing=document.getElementById('resultCalendarCard');
-  const calendarMarkup=`<section class="card" id="resultCalendarCard"><h2>Kalenderoversikt for resultat</h2><p class="muted">Markerte dager viser hele planen din i kalenderformat.</p>${html}</section>`;
-  if(existing) existing.outerHTML=calendarMarkup;
-  else document.getElementById('result').innerHTML += calendarMarkup;
-}
+      const visual=getResultDayClass(d,planPeriods,map);
 
+      if(visual==='vacation-used') cls.push('result-vacation-used');
+      else if(visual==='vacation-connected-weekend') cls.push('result-vacation-connected-weekend');
+      else if(visual==='holiday') cls.push('holiday');
+      else if(visual==='special-day') cls.push('special');
+      else if(visual==='normal-weekend') cls.push('weekend');
+      else cls.push('normal-day');
+
+      const k=dateKey(d);
+
+      if(dislikedDates.has(k)&&(visual==='vacation-used'||visual==='vacation-connected-weekend')){
+        cls.push('disliked');
+      }
+
+      const clickable=visual==='vacation-used'||visual==='vacation-connected-weekend';
+
+      body+=clickable
+        ? `<button type="button" class="${cls.join(' ')}" onclick="toggleDislikedDate('${k}')">${day}</button>`
+        : `<div class="${cls.join(' ')}">${day}</div>`;
+    }
+
+    body+='</div>';
+
+    return `
+      <section class="card" style="margin-bottom:8px;">
+        <h3>${monthNames[month]} ${year}</h3>
+        ${body}
+      </section>
+    `;
+  }).join('');
+
+  const existing=document.getElementById('resultCalendarCard');
+
+  const markup=`
+    <section class="card" id="resultCalendarCard">
+      <h2>Kalenderoversikt for resultat</h2>
+      <p class="muted">Trykk på grønne dager du ikke ønsker. Beregn deretter på nytt.</p>
+      <div class="result-calendar-grid">${html}</div>
+    </section>
+  `;
+
+  if(existing) existing.outerHTML=markup;
+  else document.getElementById('result').innerHTML+=markup;
+}
 
 function toggleDislikedDate(key){
-  if(dislikedDates.has(key)) dislikedDates.delete(key); else dislikedDates.add(key);
-  const btns=[...document.querySelectorAll(`button[onclick="toggleDislikedDate('${key}')"]`)];
-  btns.forEach(b=>b.classList.toggle('disliked',dislikedDates.has(key)));
+  if(dislikedDates.has(key)) dislikedDates.delete(key);
+  else dislikedDates.add(key);
+
+  document
+    .querySelectorAll(`button[onclick="toggleDislikedDate('${key}')"]`)
+    .forEach(b=>b.classList.toggle('disliked',dislikedDates.has(key)));
+
   updateRecalculateUi();
 }
+
 function updateRecalculateUi(){
   const card=document.getElementById('recalcCard');
   const btn=document.getElementById('recalculateBtn');
+
   if(!card||!btn) return;
-  const activeDisliked=[...dislikedDates].filter(k=>latestPlanPeriods.some(p=>p.days.some(d=>d.type==='vacation'&&dateKey(d.date)===k)));
+
+  const active=[...dislikedDates].filter(k=>
+    latestPlanPeriods.some(p=>
+      p.days.some(d=>d.type==='vacation'&&dateKey(d.date)===k)
+    )
+  );
+
   card.style.display=latestPlanPeriods.length?'block':'none';
-  btn.disabled=activeDisliked.length===0;
+  btn.disabled=active.length===0;
 }
+
 async function recalculateAroundDisliked(){
   const warning=document.getElementById('recalcWarning');
-  warning.textContent='';
-  await runPlanner();
-  const resultNode=document.getElementById('result');
-  if(resultNode) resultNode.scrollIntoView({behavior:'smooth',block:'start'});
-  const remaining=[...dislikedDates].filter(k=>latestPlanPeriods.some(p=>p.days.some(d=>d.type==='vacation'&&dateKey(d.date)===k)));
-  const planSet=new Set(latestPlanPeriods.flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>dateKey(d.date))));
-  [...dislikedDates].forEach(k=>{ if(!planSet.has(k)) dislikedDates.delete(k); });
-  if(remaining.length){ warning.textContent='Noen unngåtte dager ble beholdt fordi vi ikke fant en bedre gyldig plan.'; }
+  if(warning) warning.textContent='';
+
+  await runPlanner('balanced');
+
+  document.getElementById('result')?.scrollIntoView({behavior:'smooth',block:'start'});
+
+  const planSet=new Set(
+    latestPlanPeriods.flatMap(p=>
+      p.days.filter(d=>d.type==='vacation').map(d=>dateKey(d.date))
+    )
+  );
+
+  const remaining=[...dislikedDates].filter(k=>planSet.has(k));
+
+  [...dislikedDates].forEach(k=>{
+    if(!planSet.has(k)) dislikedDates.delete(k);
+  });
+
+  if(remaining.length&&warning){
+    warning.textContent='Noen unngåtte dager ble beholdt fordi vi ikke fant en bedre gyldig plan uten dem.';
+  }
+
   updateRecalculateUi();
+}
+
+function writeSelectedToTextarea(){
+  document.getElementById('selectedCount').textContent=`${selectedDates.size} dager valgt`;
 }
 
 function renderCalendar(){
   const year=Number(document.getElementById('year').value);
-  const includeSpecial=document.getElementById('includeSpecial').checked;
-  const {map}=holidaysNO(year,includeSpecial);
+  const {map}=holidaysNO(year,document.getElementById('includeSpecial').checked);
   const root=document.getElementById('calendar');
   const month=((pickerMonth%12)+12)%12;
+
   document.getElementById('pickerMonthLabel').textContent=`${monthNames[month]} ${year}`;
+
   const first=new Date(year,month,1);
   const last=new Date(year,month+1,0);
   const offset=(first.getDay()+6)%7;
-  let html = '<div class="calendar-grid">'+['man','tir','ons','tor','fre','lør','søn'].map(d=>`<div class="weekday-head">${d}</div>`).join('')+'</div>';
-  html += '<div class="calendar-grid">';
-  for(let i=0;i<offset;i++) html += '<div class="calendar-day empty"></div>';
+
+  let html='<div class="calendar-grid">'+
+    ['man','tir','ons','tor','fre','lør','søn'].map(d=>`<div class="weekday-head">${d}</div>`).join('')+
+    '</div><div class="calendar-grid">';
+
+  for(let i=0;i<offset;i++) html+='<div class="calendar-day empty"></div>';
+
   for(let day=1;day<=last.getDate();day++){
-    const d=new Date(year,month,day); const key=dateKey(d); const holiday=map[key];
+    const d=new Date(year,month,day);
+    const key=dateKey(d);
+    const holiday=map[key];
     const cls=['calendar-day'];
+
     if(isWeekend(d)) cls.push('weekend');
-    if(holiday) cls.push(holiday.includes('spesialdag') ? 'special' : 'holiday');
+    if(holiday) cls.push(holiday.includes('spesialdag')?'special':'holiday');
     if(selectedDates.has(key)) cls.push('selected');
-    html += `<button type="button" class="${cls.join(' ')}" onclick="smartToggleDate('${key}')">${day}</button>`;
+
+    html+=`<button type="button" class="${cls.join(' ')}" onclick="smartToggleDate('${key}')">${day}</button>`;
   }
-  html += '</div>';
+
+  html+='</div>';
   root.innerHTML=html;
+
   writeSelectedToTextarea();
 }
 
 function fillShortGaps(){
   const sorted=[...selectedDates].map(k=>new Date(k)).sort((a,b)=>a-b);
   let changed=false;
+
   for(let i=1;i<sorted.length;i++){
     const prev=sorted[i-1];
     const cur=sorted[i];
-    const diff=(cur-prev)/(1000*60*60*24);
+    const diff=(cur-prev)/86400000;
+
     if(diff<=1||diff>3) continue;
+
     for(let d=1;d<diff;d++){
-      const mid=addDays(prev,d);
-      const k=dateKey(mid);
+      const k=dateKey(addDays(prev,d));
+
       if(!selectedDates.has(k)){
         selectedDates.add(k);
         changed=true;
       }
     }
   }
+
   return changed;
 }
+
 function smartToggleDate(key){
   if(selectedDates.has(key)){
     selectedDates.delete(key);
     renderCalendar();
     return;
   }
+
   selectedDates.add(key);
+
   while(fillShortGaps()){}
+
   renderCalendar();
 }
-function changePickerMonth(delta){ pickerMonth=(pickerMonth+delta+12)%12; renderCalendar(); }
-function selectWholeMonth(){ const year=Number(document.getElementById('year').value); const month=((pickerMonth%12)+12)%12; const last=new Date(year,month+1,0).getDate(); for(let i=1;i<=last;i++) selectedDates.add(dateKey(new Date(year,month,i))); renderCalendar(); }
-function clearSelectedDays(){ selectedDates.clear(); renderCalendar(); }
 
-yearSel.addEventListener('change',()=>{pickerMonth=0; clearSelectedDays(); renderCalendar(); document.getElementById('result').innerHTML='';});
-document.getElementById('includeSpecial').addEventListener('change',()=>{renderCalendar(); document.getElementById('result').innerHTML='';});
-document.getElementById('transferDays').addEventListener('input',()=>{document.getElementById('result').innerHTML='';});
+function changePickerMonth(delta){
+  pickerMonth=(pickerMonth+delta+12)%12;
+  renderCalendar();
+}
+
+function selectWholeMonth(){
+  const year=Number(document.getElementById('year').value);
+  const month=((pickerMonth%12)+12)%12;
+  const last=new Date(year,month+1,0).getDate();
+
+  for(let i=1;i<=last;i++){
+    selectedDates.add(dateKey(new Date(year,month,i)));
+  }
+
+  renderCalendar();
+}
+
+function clearSelectedDays(){
+  selectedDates.clear();
+  renderCalendar();
+}
+
+function resetResultOnly(){
+  document.getElementById('result').innerHTML='';
+  latestPlanPeriods=[];
+  latestPlanYear=null;
+  updateRecalculateUi();
+}
+
+yearSel.addEventListener('change',()=>{
+  pickerMonth=0;
+  clearSelectedDays();
+  dislikedDates.clear();
+  resetResultOnly();
+  renderCalendar();
+});
+
+['includeSpecial','transferDays','days','minContinuousWeeks','avoidPeakHolidayPeriods','season'].forEach(id=>{
+  document.getElementById(id).addEventListener(
+    id==='includeSpecial'||id==='season'||id==='minContinuousWeeks'||id==='avoidPeakHolidayPeriods'?'change':'input',
+    ()=>{
+      if(id==='includeSpecial') renderCalendar();
+      resetResultOnly();
+    }
+  );
+});
+
 renderCalendar();
 </script>
 </body>
