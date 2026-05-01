@@ -1166,13 +1166,17 @@ function renderResultCalendar(year, planPeriods){
     body+='</div>';
     return `<section class="card" style="margin-bottom:8px;"><h3 style="margin:0 0 8px;">${monthNames[month]} ${year}</h3>${body}</section>`;
   }).join('');
-  document.getElementById('result').innerHTML += `<section class="card"><h2>Kalenderoversikt for resultat</h2><p class="muted">Markerte dager viser hele planen din i kalenderformat.</p>${html}</section>`;
+  const existing=document.getElementById('resultCalendarCard');
+  const calendarMarkup=`<section class="card" id="resultCalendarCard"><h2>Kalenderoversikt for resultat</h2><p class="muted">Markerte dager viser hele planen din i kalenderformat.</p>${html}</section>`;
+  if(existing) existing.outerHTML=calendarMarkup;
+  else document.getElementById('result').innerHTML += calendarMarkup;
 }
 
 
 function toggleDislikedDate(key){
   if(dislikedDates.has(key)) dislikedDates.delete(key); else dislikedDates.add(key);
-  if(latestPlanYear!==null) renderResultCalendar(latestPlanYear, latestPlanPeriods);
+  const btns=[...document.querySelectorAll(`button[onclick="toggleDislikedDate('${key}')"]`)];
+  btns.forEach(b=>b.classList.toggle('disliked',dislikedDates.has(key)));
   updateRecalculateUi();
 }
 function updateRecalculateUi(){
@@ -1191,7 +1195,6 @@ async function recalculateAroundDisliked(){
   const planSet=new Set(latestPlanPeriods.flatMap(p=>p.days.filter(d=>d.type==='vacation').map(d=>dateKey(d.date))));
   [...dislikedDates].forEach(k=>{ if(!planSet.has(k)) dislikedDates.delete(k); });
   if(remaining.length){ warning.textContent='Noen unngåtte dager ble beholdt fordi vi ikke fant en bedre gyldig plan.'; }
-  if(latestPlanYear!==null) renderResultCalendar(latestPlanYear, latestPlanPeriods);
   updateRecalculateUi();
 }
 
