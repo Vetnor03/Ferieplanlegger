@@ -500,6 +500,9 @@ function plan(year,available){
       candidates.filter(c=>c.type===type).forEach(c=>pushCandidate(c,'priority'));
     });
     premiumCandidates.forEach(c=>pushCandidate(c,'premium-fill'));
+    // hard fill remaining days with best non-overlapping candidates to avoid unused quota
+    const remainingCandidates=[...candidates].sort((a,b)=>b.used-a.used||b.efficiency-a.efficiency);
+    remainingCandidates.forEach(c=>pushCandidate(c,'remaining-fill'));
     return periods.sort((a,b)=>a.start-b.start);
   }
 
@@ -766,7 +769,10 @@ function plan(year,available){
     const weights={eff:10,lever:7,full:6};
     let score=free*8 + weights.eff*eff*1.2 + redLeverage*weights.lever + fullWeeks*weights.full + spreadBonus + mainHolidayQuality - partial*8 - largest - breakPenalty - concentrationPenalty;
     if(eff>2.0) score+=12; if(eff>2.5) score+=22; if(eff>2.8) score+=30;
-    if(unused<=2) score-=unused*2; else if(unused<=5) score-=unused*6; else score-=unused*14;
+    if(unused===0) score+=24;
+    else if(unused<=2) score-=unused*28;
+    else if(unused<=5) score-=unused*60;
+    else score-=unused*120;
     if(minContinuousWeeks>0){ const minReq=minContinuousWeeks*5; score += planPeriods.some(p=>p.used>=minReq)?18:-30; }
     if(strategy==='fullWeeks' && fullWeeks===0) score-=40;
     if(strategy==='spread' && months<4) score-=24;
@@ -1002,7 +1008,7 @@ function plan(year,available){
   }
 
   const highConcentrationWarning=(chosen.concentrationWindowPenalty||0)>0?'Planen fordeler ferien mer utover året for å unngå for stor konsentrasjon i én kort periode.':'';
-  return {picked,left,totalUsed,totalFree,totalGained:totalFree-totalUsed,eff:totalFree/Math.max(totalUsed,1),holidays,errors:preferred.errors,metrics:{fullCount:picked.filter(p=>p.used>=5).length,partialCount:Math.max(0,picked.filter(p=>!p.clean).length),closeGapPenalty:chosen.closeGapPenalty||0,repeatedPenalty:chosen.repeatedPenalty||0,repeatedWorkRhythmPenalty:chosen.repeatedWorkRhythmPenalty||0,repeatedMiniBreakWindowPenalty:chosen.repeatedMiniBreakWindowPenalty||0,extremeMiniBreakWindowPenalty:chosen.extremeMiniBreakWindowPenalty||0,mainHoliday:chosen.twoWeekMainHoliday||false},explanation,leftoverExplanation:left>0?`${left} dag(er) ble stående igjen fordi de ikke forbedret totalplanen uten å gjøre planen mindre ryddig.`:'Alle tilgjengelige feriedager ble brukt.',qualityLabel:strategyLabels[chosen.strategy]||'Anbefalt ferieplan',highConcentrationWarning,fallbackNote};
+  return {picked,left,totalUsed,totalFree,totalGained:totalFree-totalUsed,eff:totalFree/Math.max(totalUsed,1),holidays,errors:preferred.errors,metrics:{fullCount:picked.filter(p=>p.used>=5).length,partialCount:Math.max(0,picked.filter(p=>!p.clean).length),closeGapPenalty:chosen.closeGapPenalty||0,repeatedPenalty:chosen.repeatedPenalty||0,repeatedWorkRhythmPenalty:chosen.repeatedWorkRhythmPenalty||0,repeatedMiniBreakWindowPenalty:chosen.repeatedMiniBreakWindowPenalty||0,extremeMiniBreakWindowPenalty:chosen.extremeMiniBreakWindowPenalty||0,mainHoliday:chosen.twoWeekMainHoliday||false},explanation,leftoverExplanation:left>0?`${left} dag(er) ble stående igjen. Prøv "Beregn på nytt" eller juster preferanser for å bruke flere dager.`:'Alle tilgjengelige feriedager ble brukt.',qualityLabel:strategyLabels[chosen.strategy]||'Anbefalt ferieplan',highConcentrationWarning,fallbackNote};
 }
 const formatDate=d=>`${d.getDate()}. ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
 function isDateInsidePeriod(date, period){
